@@ -1,4 +1,4 @@
--- WarlockCore v1.4.3
+-- WarlockCore v1.4.4
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -49,6 +49,19 @@ end
 local function HasBuff(unit, spell)
     local tex = buffTextures[spell]; if not tex then return false end
     for i = 1, 32 do local bTex = UnitBuff(unit, i); if not bTex then break end; if bTex == tex then return true end end
+    return false
+end
+
+local function WRC_UseHealthstone()
+    for b = 0, 4 do
+        for s = 1, GetContainerNumSlots(b) do
+            local link = GetContainerItemLink(b, s)
+            if link and string.find(link, "Healthstone") then
+                local _, dur = GetContainerItemCooldown(b, s)
+                if dur == 0 then UseContainerItem(b, s); return true end
+            end
+        end
+    end
     return false
 end
 
@@ -116,6 +129,11 @@ end
 function WarlockCore_Rotate()
     if not WarlockCore_Config then return end
     
+    -- 0. Emergency
+    if WarlockCore_Config.AutoHealthstone and (UnitHealth("player")/UnitHealthMax("player")) < 0.25 then
+        if WRC_UseHealthstone() then dbg("Emergency Healthstone used!"); return end
+    end
+
     -- 1. Buff Isolation
     if WarlockCore_Config.SelectedBuff and WarlockCore_Config.SelectedBuff ~= "None" then
         if not HasBuff("player", WarlockCore_Config.SelectedBuff) then
@@ -191,9 +209,9 @@ end
 local function CreateMenu()
     if WarlockCoreMenuFrame then return end
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
-    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(380); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
+    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.3|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.4|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -236,7 +254,8 @@ local function CreateMenu()
 
     MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 150)
     MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 150)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -230, 5, 50, 290)
+    MakeToggle(pRot, "Auto Use Healthstone", "AutoHealthstone", 15, -215, 290)
+    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -260, 5, 50, 290)
 
     -- Pet Tab
     MakeToggle(pPet, "Pet Assist Mode", "PetAssist", 20, 0, 290)
@@ -253,8 +272,12 @@ local function CreateMenu()
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="WarlockFear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
-    MakeToggle(pInf, "Debug Mode", "Debug", 20, -100, 290)
-    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(120); relB:SetHeight(26); relB:SetPoint("TOPLEFT", 20, -140); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
+
+    local xp = GetXPExhaustion() or 0; local xpPct = math.floor(100 * xp / UnitXPMax("player"))
+    local restL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); restL:SetPoint("TOPLEFT", 20, -100); restL:SetText("|cff9482c9Rested XP: |r" .. xpPct .. "%")
+
+    MakeToggle(pInf, "Debug Mode", "Debug", 20, -140, 290)
+    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(120); relB:SetHeight(26); relB:SetPoint("TOPLEFT", 20, -180); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
     ShowTab(1); f:Show()
 end
 
@@ -316,8 +339,20 @@ loader:SetScript("OnEvent", function()
             end
         end
     elseif event == "PLAYER_LOGIN" then
+        local xp = GetXPExhaustion() or 0; local xpPct = math.floor(100 * xp / UnitXPMax("player"))
+        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v1.4.3|r Loaded. Currently |cff00ff00" .. xpPct .. "%|r Rested.")
         if not WarlockCoreMinimapButton then
-            WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end); local angle = math.rad(WarlockCore_Config.MinimapPos or 120); WarlockCoreMinimapButton:SetPoint("CENTER", "Minimap", "CENTER", math.cos(angle)*80, math.sin(angle)*80)
+            WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end)
+            WarlockCoreMinimapButton:SetScript("OnEnter", function() 
+                GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+                local rXP = GetXPExhaustion() or 0; local rPct = math.floor(100 * rXP / UnitXPMax("player"))
+                GameTooltip:AddLine("|cff9482c9WarlockCore|r")
+                GameTooltip:AddLine("Currently |cff00ff00" .. rPct .. "%|r Rested", 1, 1, 1)
+                GameTooltip:AddLine("Left-Click to toggle menu", 0.7, 0.7, 0.7)
+                GameTooltip:Show()
+            end)
+            WarlockCoreMinimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            local angle = math.rad(WarlockCore_Config.MinimapPos or 120); WarlockCoreMinimapButton:SetPoint("CENTER", "Minimap", "CENTER", math.cos(angle)*80, math.sin(angle)*80)
         end
     end
 end)
