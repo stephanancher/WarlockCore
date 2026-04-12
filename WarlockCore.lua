@@ -1,4 +1,4 @@
--- WarlockCore v1.4.7
+-- WarlockCore v1.4.8
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -212,7 +212,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.7|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.8|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -260,11 +260,11 @@ local function CreateMenu()
 
     local line = pRot:CreateTexture(nil, "ARTWORK"); line:SetHeight(1); line:SetWidth(310); line:SetPoint("TOP", 0, -170); line:SetTexture(0.5, 0.4, 0.7, 0.5)
 
-    MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 150)
-    MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 150)
-    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -215, 170)
-    MakeEditBox(pRot, "@ %:", "HealthstoneHP", 195, -215, 45)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -250, 5, 50, 290)
+    MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 152)
+    MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 152)
+    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -220, 152)
+    MakeEditBox(pRot, "@ %:", "HealthstoneHP", 175, -220, 45)
+    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -260, 5, 50, 290)
 
     -- Pet Tab
     MakeToggle(pPet, "Pet Assist Mode", "PetAssist", 20, 0, 290)
