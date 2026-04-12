@@ -1,8 +1,21 @@
--- WarlockCore v1.6.9
+-- WarlockCore v1.7.0
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
+
+local currentVer = "1.7.0"
+local gitUrl = "https://github.com/stephanancher/WarlockCore"
+
+function WRC_CompareVer(v1, v2)
+    local function s(v) local t={}; for v in string.gfind(v, "(%d+)") do table.insert(t,tonumber(v)) end; return t end
+    local a,b = s(v1), s(v2)
+    for i=1,math.max(table.getn(a),table.getn(b)) do
+        local n1,n2 = a[i] or 0, b[i] or 0
+        if n1>n2 then return 1 elseif n1<n2 then return -1 end
+    end
+    return 0
+end
 
 local iconUpdateTick = 0
 local dragIconTex, dragPetIconTex
@@ -231,7 +244,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.9|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.0|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -369,25 +382,36 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.DrainSoulSmart == nil then WarlockCore_Config.DrainSoulSmart = true end
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
         if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
-    elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" then
-        if string.find(arg1, "(.+) is immune%.$") then
-            local _, _, targetName = string.find(arg1, "(.+) is immune%.$")
-            if targetName and WarlockCore_LastAttempt == "Fear" then
+    elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" or event == "UI_ERROR_MESSAGE" then
+        if arg1 and string.find(string.lower(arg1), "immune") then
+            local name = UnitName("target")
+            if name and WarlockCore_LastAttempt == "Fear" then
                 if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
-                if not WarlockCore_Config.ImmuneMobs[targetName] then
-                    WarlockCore_Config.ImmuneMobs[targetName] = true
-                    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. targetName .. "|r to Fear Immune list.")
+                if not WarlockCore_Config.ImmuneMobs[name] then
+                    WarlockCore_Config.ImmuneMobs[name] = true
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. name .. "|r to immune list (Fear skip active).")
+                    local d = getglobal("WRC_Drop_SelectedImmune")
+                    if d then UIDropDownMenu_Initialize(d, function() for _, v in ipairs(GetImmList()) do local val = v; local i = { text = v, value = v, func = function() UIDropDownMenu_SetSelectedValue(d, val); WarlockCore_Config.SelectedImmune = val; UIDropDownMenu_SetText(val, d) end }; UIDropDownMenu_AddButton(i) end end) end
                 end
             end
         end
-    elseif event == "UI_ERROR_MESSAGE" then
-        if arg1 == "A more powerful spell is already active." or arg1 == "The spell is already active." then
+        if event == "UI_ERROR_MESSAGE" and (arg1 == "A more powerful spell is already active." or arg1 == "The spell is already active.") then
             if WarlockCore_LastAttempt then
                 myDots[WarlockCore_LastAttempt] = { target = GetUnitFingerprint("target"), time = GetTime(), failed = true }
             end
         end
+    elseif event == "PARTY_MEMBERS_CHANGED" then
+        SendAddonMessage("WRC_V", currentVer, "PARTY")
+    elseif event == "CHAT_MSG_ADDON" and arg1 == "WRC_V" then
+        if arg2 and arg3 ~= UnitName("player") then
+            if WRC_CompareVer(arg2, currentVer) > 0 then
+                DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Newer version detected (|cffff0000v" .. arg2 .. "|r) on |cff00ffff" .. arg3 .. "|r!")
+                DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Download at: |cff00ff00" .. gitUrl .. "|r")
+            end
+        end
     elseif event == "PLAYER_LOGIN" then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v1.5.0|r Loaded. Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested.")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v" .. currentVer .. "|r Loaded. Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested.")
+        SendAddonMessage("WRC_V", currentVer, "PARTY")
         SLASH_WARLOCKCORE1 = "/wrc"
         SlashCmdList["WARLOCKCORE"] = function(msg)
             if msg == "reset" then
