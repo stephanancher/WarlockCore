@@ -1,4 +1,4 @@
--- WarlockCore v1.4.9
+-- WarlockCore v1.5.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -182,10 +182,10 @@ function WarlockCore_Fear()
     local name = UnitName("target")
     if WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] then
         dbg("Target is IMMUNE to Fear! Casting Shadow Bolt instead.")
-        CastSpellByName("Shadow Bolt")
-    else
-        CastSpellByName("Fear")
+        WarlockCore_LastAttempt = "Shadow Bolt"; CastSpellByName("Shadow Bolt"); return
     end
+    
+    WarlockCore_LastAttempt = "Fear"; CastSpellByName("Fear")
 end
 
 function WarlockCore_Summon()
@@ -217,7 +217,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.9|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -289,8 +289,27 @@ local function CreateMenu()
 
     local restL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); restL:SetPoint("TOPLEFT", 20, -100); restL:SetText("|cff9482c9Rested XP: |r" .. WRC_GetRestedString())
 
-    MakeToggle(pInf, "Debug Mode", "Debug", 20, -140, 290)
-    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(120); relB:SetHeight(26); relB:SetPoint("TOPLEFT", 20, -180); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
+    local function GetImmList() local list = {}; for k, _ in pairs(WarlockCore_Config.ImmuneMobs or {}) do table.insert(list, k) end; table.sort(list); if #list == 0 then table.insert(list, "None") end; return list end
+    MakeDrop(pInf, "Manage Immune Mobs:", "SelectedImmune", 20, -140, GetImmList(), 150)
+
+    local remB = CreateFrame("Button", nil, pInf); remB:SetWidth(100); remB:SetHeight(24); remB:SetPoint("TOPLEFT", 190, -155); StyleButton(remB); local remT = remB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); remT:SetPoint("CENTER", 0, 0); remT:SetText("Remove"); 
+    remB:SetScript("OnClick", function() 
+        local name = WarlockCore_Config.SelectedImmune
+        if name and name ~= "None" then
+            WarlockCore_Config.ImmuneMobs[name] = nil
+            WarlockCore_Config.SelectedImmune = "None"
+            DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Removed |cffff0000" .. name .. "|r from immune list.")
+            -- Refresh the dropdown
+            local d = getglobal("WRC_Drop_SelectedImmune")
+            if d then 
+                UIDropDownMenu_Initialize(d, function() for _, v in ipairs(GetImmList()) do local val = v; local i = { text = v, value = v, func = function() UIDropDownMenu_SetSelectedValue(d, val); WarlockCore_Config.SelectedImmune = val; UIDropDownMenu_SetText(val, d) end }; UIDropDownMenu_AddButton(i) end end)
+                UIDropDownMenu_SetSelectedValue(d, "None"); UIDropDownMenu_SetText("None", d)
+            end
+        end
+    end)
+
+    MakeToggle(pInf, "Debug Mode", "Debug", 20, -190, 240)
+    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(120); relB:SetHeight(26); relB:SetPoint("TOPLEFT", 20, -230); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
     ShowTab(1); f:Show()
 end
 
@@ -330,21 +349,14 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
         if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
     elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" then
-        -- Pattern: Your Fear failed. [Name] is immune.
-        local _, _, mob = string.find(arg1, "Your Fear failed%. (.+) is immune%.")
-        if not mob then _, _, mob = string.find(arg1, "Your Fear was resisted by (.+)%.") end -- Just in case they meant resisted too, but user said immune.
-        if mob then
-            if mob == "Target" then mob = UnitName("target") end
-            if mob and not WarlockCore_Config.ImmuneMobs[mob] and not UnitIsPlayer("target") then
-                WarlockCore_Config.ImmuneMobs[mob] = true
-                DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. mob .. "|r to Fear Immune list.")
-            end
-        elseif string.find(arg1, "Fear") and string.find(arg1, "immune") then
-            -- Fallback if pattern fails
-            local targetName = UnitName("target")
-            if targetName and not WarlockCore_Config.ImmuneMobs[targetName] and not UnitIsPlayer("target") then
-                WarlockCore_Config.ImmuneMobs[targetName] = true
-                DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. targetName .. "|r to Fear Immune list (Fallback).")
+        if string.find(arg1, "(.+) is immune%.$") then
+            local _, _, targetName = string.find(arg1, "(.+) is immune%.$")
+            if targetName and WarlockCore_LastAttempt == "Fear" then
+                if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
+                if not WarlockCore_Config.ImmuneMobs[targetName] then
+                    WarlockCore_Config.ImmuneMobs[targetName] = true
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. targetName .. "|r to Fear Immune list.")
+                end
             end
         end
     elseif event == "UI_ERROR_MESSAGE" then
@@ -354,7 +366,25 @@ loader:SetScript("OnEvent", function()
             end
         end
     elseif event == "PLAYER_LOGIN" then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v1.4.9|r Loaded. Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested.")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v1.5.0|r Loaded. Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested.")
+        SLASH_WARLOCKCORE1 = "/wrc"
+        SlashCmdList["WARLOCKCORE"] = function(msg)
+            if msg == "reset" then
+                WarlockCore_Config.ImmuneMobs = {}
+                DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Immune Mob list cleared.")
+            elseif string.find(msg, "^clear (.+)") then
+                local _, _, name = string.find(msg, "^clear (.+)")
+                if WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] then
+                    WarlockCore_Config.ImmuneMobs[name] = nil
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Removed |cffff0000" .. name .. "|r from immune list.")
+                else
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Mob |cffff0000" .. name .. "|r not found in list.")
+                end
+            else
+                if not WarlockCoreMenuFrame then CreateMenu() end
+                if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end
+            end
+        end
         if not WarlockCoreMinimapButton then
             WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end)
             WarlockCoreMinimapButton:SetScript("OnEnter", function() 
