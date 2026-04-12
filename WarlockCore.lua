@@ -1,4 +1,4 @@
--- WarlockCore v1.5.8
+-- WarlockCore v1.5.9
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -223,7 +223,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.8|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.9|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -286,7 +286,7 @@ local function CreateMenu()
     local dragPetL = pPet:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragPetL:SetPoint("TOPLEFT", 20, -185); dragPetL:SetText("Drag Macro: Summon")
 
     -- Buff Tab
-    MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 90, 0, warlockBuffs, 130)
+    MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 80, 0, warlockBuffs, 110)
     MakeToggle(pBuf, "Auto Life Tap", "AutoLifeTap", 15, -60, 170)
     MakeEditBox(pBuf, "At %:", "LifeTapHP", 195, -60, 45)
 
@@ -296,7 +296,7 @@ local function CreateMenu()
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
 
     local function GetImmList() local list = {}; for k, _ in pairs(WarlockCore_Config.ImmuneMobs or {}) do table.insert(list, k) end; table.sort(list); if table.getn(list) == 0 then table.insert(list, "None") end; return list end
-    MakeDrop(pInf, "Immune Mobs:", "SelectedImmune", 10, -100, GetImmList(), 140)
+    MakeDrop(pInf, "Immune Mobs:", "SelectedImmune", 10, -100, GetImmList(), 100)
 
     local remB = CreateFrame("Button", nil, pInf); remB:SetWidth(152); remB:SetHeight(24); remB:SetPoint("TOPLEFT", 175, -115); StyleButton(remB); local remT = remB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); remT:SetPoint("CENTER", 0, 0); remT:SetText("Remove Selected"); 
     remB:SetScript("OnClick", function() 
