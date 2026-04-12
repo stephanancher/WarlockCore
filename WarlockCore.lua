@@ -1,4 +1,4 @@
--- WarlockCore v1.5.5
+-- WarlockCore v1.5.6
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -142,7 +142,7 @@ function WarlockCore_Rotate()
 
     -- 0b. Smart Life Tap
     local tapHP = WarlockCore_Config.LifeTapHP or 40
-    if UnitMana("player") < 150 and (UnitHealth("player")/UnitHealthMax("player")*100) > tapHP then
+    if WarlockCore_Config.AutoLifeTap and UnitMana("player") < 150 and (UnitHealth("player")/UnitHealthMax("player")*100) > tapHP then
         CastSpellByName("Life Tap"); return
     end
 
@@ -223,7 +223,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.5|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.6|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -287,7 +287,8 @@ local function CreateMenu()
 
     -- Buff Tab
     MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 10, 0, warlockBuffs, 140)
-    MakeSlider(pBuf, "Life Tap HP Safety", "LifeTapHP", 20, -65, 10, 90, 290)
+    MakeToggle(pBuf, "Auto Life Tap", "AutoLifeTap", 20, -60, 290)
+    MakeSlider(pBuf, "Life Tap HP Safety", "LifeTapHP", 20, -100, 10, 90, 290)
 
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
@@ -350,6 +351,7 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
         if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
         if WarlockCore_Config.LifeTapHP == nil then WarlockCore_Config.LifeTapHP = 40 end
+        if WarlockCore_Config.AutoLifeTap == nil then WarlockCore_Config.AutoLifeTap = true end
         if WarlockCore_Config.SmartFear == nil then WarlockCore_Config.SmartFear = true end
         if WarlockCore_Config.DrainSoulSmart == nil then WarlockCore_Config.DrainSoulSmart = true end
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
