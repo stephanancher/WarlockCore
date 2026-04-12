@@ -1,4 +1,4 @@
--- WarlockCore v1.4.5
+-- WarlockCore v1.4.6
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -212,7 +212,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.5|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.6|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -243,6 +243,13 @@ local function CreateMenu()
         local s = CreateFrame("Slider", "WRC_Slider_"..key, parent, "OptionsSliderTemplate"); s:SetPoint("TOPLEFT", x, y-20); s:SetWidth(w or 240); s:SetHeight(16); s:SetMinMaxValues(min, max); s:SetValueStep(1); s:SetValue(WarlockCore_Config[key] or min)
         getglobal(s:GetName().."Low"):SetText(min); getglobal(s:GetName().."High"):SetText(max); s:SetScript("OnValueChanged", function() WarlockCore_Config[key] = math.floor(this:GetValue()); UpdText() end)
     end
+    local function MakeEditBox(parent, label, key, x, y, w)
+        local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x, y); l:SetText("|cff9482c9"..label.."|r")
+        local b = CreateFrame("EditBox", "WRC_Edit_"..key, parent); b:SetWidth(w or 35); b:SetHeight(18); b:SetPoint("TOPLEFT", x+35, y+3); b:SetNumeric(true); b:SetMaxLetters(2); b:SetAutoFocus(false); b:SetText(WarlockCore_Config[key] or "25")
+        b:SetFontObject("GameFontHighlightSmall"); b:SetBackdrop({bgFile="Interface\\Buttons\\UI-SliderBar-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=8, edgeSize=8, insets={left=2,right=2,top=2,bottom=2}}); b:SetBackdropColor(0,0,0,1)
+        b:SetScript("OnEnterPressed", function() WarlockCore_Config[key] = tonumber(this:GetText()) or 25; this:ClearFocus() end)
+        b:SetScript("OnEscapePressed", function() this:ClearFocus() end); b:SetScript("OnEditFocusLost", function() this:SetText(WarlockCore_Config[key] or "25") end)
+    end
 
     -- Rotation Tab
     MakeDrop(pRot, "Opener:", "Opener", 90, 0, warlockSpells, 130)
@@ -255,9 +262,9 @@ local function CreateMenu()
 
     MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 150)
     MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 150)
-    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -215, 150)
-    MakeSlider(pRot, "Stone @ %", "HealthstoneHP", 185, -215, 5, 95, 130)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -265, 5, 50, 290)
+    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -215, 170)
+    MakeEditBox(pRot, "At %:", "HealthstoneHP", 195, -215, 30)
+    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -250, 5, 50, 290)
 
     -- Pet Tab
     MakeToggle(pPet, "Pet Assist Mode", "PetAssist", 20, 0, 290)
