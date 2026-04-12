@@ -1,4 +1,4 @@
--- WarlockCore v1.5.9
+-- WarlockCore v1.6.0
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -223,19 +223,19 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.9|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.0|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
-    local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
-    local btnRot, btnPet, btnBuf, btnInf
+    local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
+    local btnRot, btnPet, btnBuf, btnOpt, btnInf
     local function ShowTab(tab)
-        pRot:Hide(); pPet:Hide(); pBuf:Hide(); pInf:Hide(); btnRot:SetBackdropColor(0.1,0.1,0.1,0.8); btnPet:SetBackdropColor(0.1,0.1,0.1,0.8); btnBuf:SetBackdropColor(0.1,0.1,0.1,0.8); btnInf:SetBackdropColor(0.1,0.1,0.1,0.8)
-        if tab == 1 then pRot:Show(); btnRot:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 2 then pPet:Show(); btnPet:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 3 then pBuf:Show(); btnBuf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) else pInf:Show(); btnInf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) end
+        pRot:Hide(); pPet:Hide(); pBuf:Hide(); pOpt:Hide(); pInf:Hide(); btnRot:SetBackdropColor(0.1,0.1,0.1,0.8); btnPet:SetBackdropColor(0.1,0.1,0.1,0.8); btnBuf:SetBackdropColor(0.1,0.1,0.1,0.8); btnOpt:SetBackdropColor(0.1,0.1,0.1,0.8); btnInf:SetBackdropColor(0.1,0.1,0.1,0.8)
+        if tab == 1 then pRot:Show(); btnRot:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 2 then pPet:Show(); btnPet:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 3 then pBuf:Show(); btnBuf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 4 then pOpt:Show(); btnOpt:SetBackdropColor(0.3, 0.2, 0.5, 0.9) else pInf:Show(); btnInf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) end
     end
     local function MakeTabBtn(txt, x, tab)
-        local b = CreateFrame("Button", nil, f); b:SetWidth(75); b:SetHeight(24); b:SetPoint("TOPLEFT", x, -40); StyleButton(b); local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); t:SetPoint("CENTER", 0, 0); t:SetText(txt); b:SetScript("OnClick", function() ShowTab(tab) end); return b
+        local b = CreateFrame("Button", nil, f); b:SetWidth(62); b:SetHeight(24); b:SetPoint("TOPLEFT", x, -40); StyleButton(b); local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); t:SetPoint("CENTER", 0, 0); t:SetText(txt); b:SetScript("OnClick", function() ShowTab(tab) end); return b
     end
-    btnRot = MakeTabBtn("Rotation", 20, 1); btnPet = MakeTabBtn("Pet", 100, 2); btnBuf = MakeTabBtn("Buff", 180, 3); btnInf = MakeTabBtn("Info", 260, 4)
+    btnRot = MakeTabBtn("Rot", 15, 1); btnPet = MakeTabBtn("Pet", 80, 2); btnBuf = MakeTabBtn("Buff", 145, 3); btnOpt = MakeTabBtn("Options", 210, 4); btnInf = MakeTabBtn("Info", 275, 5)
     local function MakeDrop(parent, label, key, x, y, list, width)
         local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x + 15, y); l:SetText("|cff9482c9"..label.."|r")
         local d = CreateFrame("Frame", "WRC_Drop_" .. key, parent, "UIDropDownMenuTemplate"); d:SetPoint("TOPLEFT", x, y - 15); UIDropDownMenu_SetWidth(width or 100, d)
@@ -269,27 +269,29 @@ local function CreateMenu()
     MakeDrop(pRot, "Slot 3:", "Rotation3", 5, -120, warlockSpells, 120)
     MakeDrop(pRot, "Slot 4:", "Rotation4", 175, -120, warlockSpells, 120)
 
-    local line = pRot:CreateTexture(nil, "ARTWORK"); line:SetHeight(1); line:SetWidth(310); line:SetPoint("TOP", 0, -170); line:SetTexture(0.5, 0.4, 0.7, 0.5)
-
-    MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 152)
-    MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 152)
-    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -220, 152)
-    MakeEditBox(pRot, "@ %:", "HealthstoneHP", 175, -220, 45)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -265, 5, 50, 290)
-
     -- Pet Tab
-    MakeToggle(pPet, "Pet Assist", "PetAssist", 15, 0, 152)
-    MakeToggle(pPet, "Smart Targets", "SmartTargeting", 175, 0, 152)
-    MakeToggle(pPet, "Fast Attack", "FastAttack", 15, -35, 152)
-    MakeDrop(pPet, "Selected Pet:", "SelectedPet", 10, -75, warlockPets, 140)
-    local dragPet = CreateFrame("Button", nil, pPet); dragPet:SetWidth(50); dragPet:SetHeight(50); dragPet:SetPoint("TOPLEFT", 20,-130); StyleButton(dragPet); dragPetIconTex = dragPet:CreateTexture(nil, "OVERLAY"); dragPetIconTex:SetPoint("TOPLEFT", 4,-4); dragPetIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragPetIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); dragPet:RegisterForDrag("LeftButton"); dragPet:SetScript("OnDragStart", function() local n="WarlockSummon"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Summon()"; local ic=petIcons[WarlockCore_Config.SelectedPet or "Imp"] or "Spell_Shadow_SummonImp"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
-    local dragPetL = pPet:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragPetL:SetPoint("TOPLEFT", 20, -185); dragPetL:SetText("Drag Macro: Summon")
+    MakeDrop(pPet, "Selected Pet:", "SelectedPet", 10, 0, warlockPets, 140)
+    local dragPet = CreateFrame("Button", nil, pPet); dragPet:SetWidth(50); dragPet:SetHeight(50); dragPet:SetPoint("TOPLEFT", 20,-60); StyleButton(dragPet); dragPetIconTex = dragPet:CreateTexture(nil, "OVERLAY"); dragPetIconTex:SetPoint("TOPLEFT", 4,-4); dragPetIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragPetIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); dragPet:RegisterForDrag("LeftButton"); dragPet:SetScript("OnDragStart", function() local n="WarlockSummon"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Summon()"; local ic=petIcons[WarlockCore_Config.SelectedPet or "Imp"] or "Spell_Shadow_SummonImp"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragPetL = pPet:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragPetL:SetPoint("TOPLEFT", 20, -115); dragPetL:SetText("Drag Macro: Summon")
 
     -- Buff Tab
-    MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 80, 0, warlockBuffs, 110)
-    MakeToggle(pBuf, "Auto Life Tap", "AutoLifeTap", 15, -60, 170)
-    MakeEditBox(pBuf, "At %:", "LifeTapHP", 195, -60, 45)
+    MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 15, 0, warlockBuffs, 140)
 
+    -- Options Tab
+    MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152)
+    MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152)
+    MakeToggle(pOpt, "Auto Healthstone", "AutoHealthstone", 15, -30, 170)
+    MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -30, 45)
+    MakeToggle(pOpt, "Auto Life Tap", "AutoLifeTap", 15, -60, 170)
+    MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -60, 45)
+    MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -90, 152)
+    MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -90, 152)
+    MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -120, 152)
+    MakeToggle(pOpt, "Debug Mode", "Debug", 175, -120, 152)
+    
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -160); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -170, 5, 50, 290)
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="WarlockFear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
@@ -314,8 +316,7 @@ local function CreateMenu()
         end
     end)
 
-    MakeToggle(pInf, "Debug Mode", "Debug", 15, -150, 152)
-    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(152); relB:SetHeight(24); relB:SetPoint("TOPLEFT", 175, -150); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
+    local relB = CreateFrame("Button", nil, pInf); relB:SetWidth(152); relB:SetHeight(24); relB:SetPoint("TOPLEFT", 15, -150); StyleButton(relB); local relT = relB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); relT:SetPoint("CENTER", 0, 0); relT:SetText("Reload UI"); relB:SetScript("OnClick", function() ReloadUI() end)
     ShowTab(1); f:Show()
 end
 
