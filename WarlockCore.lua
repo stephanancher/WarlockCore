@@ -1,11 +1,12 @@
--- WarlockCore v1.7.0
+-- WarlockCore v1.7.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.7.0"
+local currentVer = "1.7.1"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
+local announcedInGroup = false
 
 function WRC_CompareVer(v1, v2)
     local function s(v) local t={}; for v in string.gfind(v, "(%d+)") do table.insert(t,tonumber(v)) end; return t end
@@ -244,7 +245,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.0|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -401,7 +402,16 @@ loader:SetScript("OnEvent", function()
             end
         end
     elseif event == "PARTY_MEMBERS_CHANGED" then
-        SendAddonMessage("WRC_V", currentVer, "PARTY")
+        local channel = "PARTY"; if GetNumRaidMembers() > 0 then channel = "RAID" end
+        if GetNumPartyMembers() > 0 or GetNumRaidMembers() > 0 then
+            SendAddonMessage("WRC_V", currentVer, "PARTY")
+            if not announcedInGroup then
+                SendChatMessage("I am powered by the mighty WarlockCore! Get yours at: " .. gitUrl, channel)
+                announcedInGroup = true
+            end
+        else
+            announcedInGroup = false
+        end
     elseif event == "CHAT_MSG_ADDON" and arg1 == "WRC_V" then
         if arg2 and arg3 ~= UnitName("player") then
             if WRC_CompareVer(arg2, currentVer) > 0 then
