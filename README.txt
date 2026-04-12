@@ -32,6 +32,19 @@ PREMIUM INTERFACE:
 - Macro Sync: Real-time icon updating for Rot and Fear macros.
 
 ================================================================================
+DETAILED OPTIONS REFERENCE (OPTIONS TAB)
+================================================================================
+- Smart Fear     : Skips Fear on immune targets (Undead/Mech) to save mana.
+- Smart Drain    : Manages Drain Soul rank conflicts for smooth farming.
+- Auto Stone     : Automatically uses Healthstone at the chosen HP %.
+- Auto Tap       : Safe Life Tap logic (checks both mana and health).
+- Pet Assist     : Master Switch. When OFF, addon will NOT touch pet bar.
+- Smart Targets  : Auto-targets nearest enemy if you have none selected.
+- Fast Attack    : If ON, pet charges instantly; if OFF, waits for spell hit.
+- Debug Mode     : Performance logging to chat (very spammy).
+- Drain Soul Thresh: Target HP % to start finishing the mob with Drain Soul.
+
+================================================================================
 INSTALLATION
 ================================================================================
 1. Place the 'WarlockCore' folder into your 'Interface\AddOns\' directory.
