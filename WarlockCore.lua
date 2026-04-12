@@ -1,4 +1,4 @@
--- WarlockCore v1.6.5
+-- WarlockCore v1.6.6
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -203,10 +203,17 @@ end
 local function StyleButton(b)
     b:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 2, right = 2, top = 2, bottom = 2 } })
     b:SetBackdropColor(0, 0, 0, 0.8); b:SetBackdropBorderColor(0.5, 0.4, 0.7, 1)
-    b:SetScript("OnEnter", function() this:SetBackdropBorderColor(0.7, 0.6, 1.0, 1); this:SetBackdropColor(0.1, 0.1, 0.1, 0.9) end)
-    b:SetScript("OnLeave", function() this:SetBackdropBorderColor(0.5, 0.4, 0.7, 1); this:SetBackdropColor(0, 0, 0, 0.8) end)
 end
 local function SetTip(f, t) f:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_RIGHT"); GameTooltip:SetText(t, 1, 1, 1, 1, true); GameTooltip:Show() end); f:SetScript("OnLeave", function() GameTooltip:Hide() end) end
+
+local function GetImmList() 
+    local list = {}; 
+    if not WarlockCore_Config or not WarlockCore_Config.ImmuneMobs then return {"None"} end
+    for k, _ in pairs(WarlockCore_Config.ImmuneMobs) do table.insert(list, k) end; 
+    table.sort(list); 
+    if table.getn(list) == 0 then table.insert(list, "None") end; 
+    return list 
+end
 
 function WarlockCore_Minimap_UpdatePosition()
     if not WarlockCore_Config or not WarlockCore_Config.MinimapPos then return end
@@ -224,7 +231,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.5|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.6|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -303,7 +310,6 @@ local function CreateMenu()
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
 
-    local function GetImmList() local list = {}; for k, _ in pairs(WarlockCore_Config.ImmuneMobs or {}) do table.insert(list, k) end; table.sort(list); if table.getn(list) == 0 then table.insert(list, "None") end; return list end
     MakeDrop(pInf, "Immune Mobs:", "SelectedImmune", 10, -100, GetImmList(), 100)
 
     local remB = CreateFrame("Button", nil, pInf); remB:SetWidth(152); remB:SetHeight(24); remB:SetPoint("TOPLEFT", 175, -115); StyleButton(remB); local remT = remB:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); remT:SetPoint("CENTER", 0, 0); remT:SetText("Remove Selected"); 
