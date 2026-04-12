@@ -1,4 +1,4 @@
--- WarlockCore v1.4.0
+-- WarlockCore v1.4.3
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -52,27 +52,43 @@ local function HasBuff(unit, spell)
     return false
 end
 
+local function GetUnitFingerprint(unit)
+    if not UnitExists(unit) then return nil end
+    return UnitName(unit) .. "_" .. UnitLevel(unit) .. "_" .. UnitHealthMax(unit)
+end
+
 local function HasDebuff(unit, spell)
-    local tx = WRC_GetSpellTexture(spell); local texture = "Interface\\Icons\\" .. tx
+    local tx = WRC_GetSpellTexture(spell)
+    if not tx then return false end
+    local texture = "interface\\icons\\" .. string.lower(tx)
+    
     local exists = false
-    for i = 1, 16 do 
+    for i = 1, 64 do 
         local dTex = UnitDebuff(unit, i)
         if not dTex then break end
-        if dTex == texture then exists = true; break end 
+        if string.lower(dTex) == texture then exists = true; break end 
     end
     
     if not exists then return false end
     
     local record = myDots[spell]
-    if record and record.target == UnitName(unit) then
+    local fp = GetUnitFingerprint(unit)
+    if record and record.target == fp then
         local elapsed = GetTime() - record.time
-        local dur = 20
-        if spell == "Corruption" then dur = 18
-        elseif spell == "Curse of Agony" then dur = 24
-        elseif spell == "Siphon Life" then dur = 30
-        elseif spell == "Immolate" then dur = 15
+        if record.failed then
+            if elapsed < 5 then return true end -- Retry cooldown for failed overwrites
+        else
+            local dur = 0
+            if spell == "Corruption" then dur = 18
+            elseif spell == "Curse of Agony" then dur = 24
+            elseif spell == "Siphon Life" then dur = 30
+            elseif spell == "Immolate" then dur = 15
+            elseif spell == "Drain Life" then dur = 5
+            elseif spell == "Drain Soul" then dur = 15
+            elseif spell == "Fear" then dur = 20
+            end
+            if elapsed < (dur - 1.5) then return true end
         end
-        if elapsed < (dur - 1.5) then return true end
     end
     return false
 end
@@ -129,8 +145,9 @@ function WarlockCore_Rotate()
     end
     local ns = GetNextSpell()
     if ns and ns ~= "None" then 
+        WarlockCore_LastAttempt = ns
         CastSpellByName(ns)
-        myDots[ns] = { target = UnitName("target"), time = GetTime() }
+        myDots[ns] = { target = GetUnitFingerprint("target"), time = GetTime() }
     end
 end
 
@@ -176,7 +193,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(380); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.0|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.3|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -243,7 +260,7 @@ end
 
 -- --- Loader ---
 local loader = CreateFrame("Frame")
-loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE")
+loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE"); loader:RegisterEvent("UI_ERROR_MESSAGE")
 loader:SetScript("OnUpdate", function() 
     local elapsed = arg1 or 0; iconUpdateTick = iconUpdateTick + elapsed; if iconUpdateTick < 0.33 then return end; iconUpdateTick = 0
     local iconSpell = "None"
@@ -290,6 +307,12 @@ loader:SetScript("OnEvent", function()
             if targetName and not WarlockCore_Config.ImmuneMobs[targetName] and not UnitIsPlayer("target") then
                 WarlockCore_Config.ImmuneMobs[targetName] = true
                 DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Added |cffff0000" .. targetName .. "|r to Fear Immune list (Fallback).")
+            end
+        end
+    elseif event == "UI_ERROR_MESSAGE" then
+        if arg1 == "A more powerful spell is already active." or arg1 == "The spell is already active." then
+            if WarlockCore_LastAttempt then
+                myDots[WarlockCore_LastAttempt] = { target = GetUnitFingerprint("target"), time = GetTime(), failed = true }
             end
         end
     elseif event == "PLAYER_LOGIN" then
