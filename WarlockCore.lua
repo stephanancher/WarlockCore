@@ -1,4 +1,4 @@
--- WarlockCore v1.6.2
+-- WarlockCore v1.6.4
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -206,6 +206,7 @@ local function StyleButton(b)
     b:SetScript("OnEnter", function() this:SetBackdropBorderColor(0.7, 0.6, 1.0, 1); this:SetBackdropColor(0.1, 0.1, 0.1, 0.9) end)
     b:SetScript("OnLeave", function() this:SetBackdropBorderColor(0.5, 0.4, 0.7, 1); this:SetBackdropColor(0, 0, 0, 0.8) end)
 end
+local function SetTip(f, t) f:SetScript("OnEnter", function() GameTooltip:SetOwner(this, "ANCHOR_RIGHT"); GameTooltip:SetText(t, 1, 1, 1, 1, true); GameTooltip:Show() end); f:SetScript("OnLeave", function() GameTooltip:Hide() end) end
 
 function WarlockCore_Minimap_UpdatePosition()
     if not WarlockCore_Config or not WarlockCore_Config.MinimapPos then return end
@@ -221,9 +222,9 @@ end
 local function CreateMenu()
     if WarlockCoreMenuFrame then return end
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
-    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(450); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
+    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.2|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.4|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -247,6 +248,7 @@ local function CreateMenu()
         local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); t:SetPoint("CENTER", 0, 0)
         local function Upd() t:SetText(txt..": "..(WarlockCore_Config[key] and "|cff00ff00ON|r" or "|cffff0000OFF|r")) end; Upd()
         b:SetScript("OnClick", function() WarlockCore_Config[key] = not WarlockCore_Config[key]; Upd() end) 
+        return b
     end
     local function MakeSlider(parent, label, key, x, y, min, max, w)
         local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x, y); 
@@ -278,30 +280,27 @@ local function CreateMenu()
     MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 15, 0, warlockBuffs, 140)
 
     -- Options Tab
-    local function MakeLabel(p, t, x, y) local l = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x, y); l:SetText("|cff9482c9"..t.."|r"); return l end
+    local sf = MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152); SetTip(sf, "Remembers immune mobs and automatically skips Fear on them.")
+    local sd = MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152); SetTip(sd, "Automatically detects lower rank/power conflicts and manages retries.")
     
-    MakeLabel(pOpt, "Combat: Smart Fear & Drain logic", 15, 0)
-    MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, -20, 152)
-    MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, -20, 152)
+    local as = MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -35, 152); SetTip(as, "Automatically consumes a Healthstone when your HP drops below the chosen %.")
+    MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -35, 45)
     
-    MakeLabel(pOpt, "Resources: Managed Healthstone & Tapping", 15, -60)
-    MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -80, 152)
-    MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -80, 45)
-    MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -110, 152)
-    MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -110, 45)
+    local at = MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -70, 152); SetTip(at, "Automatically uses Life Tap during rotation if mana is low and health is safe.")
+    MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -70, 45)
     
-    MakeLabel(pOpt, "Automation: Pet & System controls", 15, -150)
-    MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -170, 152)
-    MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -170, 152)
-    MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -200, 152)
-    MakeToggle(pOpt, "Debug Mode", "Debug", 175, -200, 152)
+    local pa = MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -105, 152); SetTip(pa, "Your pet will automatically engage as soon as you press your Rotation macro.")
+    local st = MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -105, 152); SetTip(st, "Prevents pet from switching targets mid-fight if your target changes accidentally.")
     
-    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -235); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    local fa = MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -140, 152); SetTip(fa, "Uses a high-priority pet command to bypass some 1.12.1 client delays.")
+    local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 175, -140, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
     
-    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -245, 5, 50, 290)
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -180); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -190, 5, 50, 290)
     -- Info Tab
-    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
-    local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="WarlockFear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
+    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
 
     local function GetImmList() local list = {}; for k, _ in pairs(WarlockCore_Config.ImmuneMobs or {}) do table.insert(list, k) end; table.sort(list); if table.getn(list) == 0 then table.insert(list, "None") end; return list end
@@ -335,9 +334,9 @@ loader:SetScript("OnUpdate", function()
     local iconSpell = "None"
     if WarlockCore_Config and WarlockCore_Config.SelectedBuff ~= "None" and not HasBuff("player", WarlockCore_Config.SelectedBuff) then iconSpell = WarlockCore_Config.SelectedBuff else iconSpell = GetNextSpell() end
     local icon = WRC_GetSpellTexture(iconSpell); if dragIconTex then dragIconTex:SetTexture("Interface\\Icons\\" .. icon) end
-    local mIdx = WRC_GetMacroIndex("WarlockRot"); if mIdx > 0 then EditMacro(mIdx, "WarlockRot", icon, "/script WarlockCore_Rotate()", nil, nil) end 
+    local mIdx = WRC_GetMacroIndex("Rot"); if mIdx > 0 then EditMacro(mIdx, "Rot", icon, "/script WarlockCore_Rotate()", nil, nil) end 
     
-    local fIdx = WRC_GetMacroIndex("WarlockFear"); if fIdx > 0 then
+    local fIdx = WRC_GetMacroIndex("Fear"); if fIdx > 0 then
         local fIcon = "Spell_Shadow_Possession"
         local name = UnitName("target")
         if name and WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs[name] then fIcon = "Spell_Shadow_ShadowBolt" end
