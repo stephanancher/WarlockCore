@@ -1,4 +1,4 @@
--- WarlockCore v1.5.4
+-- WarlockCore v1.5.5
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -223,7 +223,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.4|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.5.5|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -275,8 +275,7 @@ local function CreateMenu()
     MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 152)
     MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -220, 152)
     MakeEditBox(pRot, "@ %:", "HealthstoneHP", 175, -220, 45)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -260, 5, 50, 290)
-    MakeSlider(pRot, "Life Tap HP Safety", "LifeTapHP", 20, -305, 10, 90, 290)
+    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -265, 5, 50, 290)
 
     -- Pet Tab
     MakeToggle(pPet, "Pet Assist Mode", "PetAssist", 20, 0, 290)
@@ -288,6 +287,7 @@ local function CreateMenu()
 
     -- Buff Tab
     MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 10, 0, warlockBuffs, 140)
+    MakeSlider(pBuf, "Life Tap HP Safety", "LifeTapHP", 20, -65, 10, 90, 290)
 
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
