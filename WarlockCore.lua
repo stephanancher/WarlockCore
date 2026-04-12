@@ -1,4 +1,4 @@
--- WarlockCore v1.4.4
+-- WarlockCore v1.4.5
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -130,7 +130,8 @@ function WarlockCore_Rotate()
     if not WarlockCore_Config then return end
     
     -- 0. Emergency
-    if WarlockCore_Config.AutoHealthstone and (UnitHealth("player")/UnitHealthMax("player")) < 0.25 then
+    local hsHP = WarlockCore_Config.HealthstoneHP or 25
+    if WarlockCore_Config.AutoHealthstone and (UnitHealth("player")/UnitHealthMax("player"))*100 < hsHP then
         if WRC_UseHealthstone() then dbg("Emergency Healthstone used!"); return end
     end
 
@@ -211,7 +212,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.4|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.5|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
@@ -254,8 +255,9 @@ local function CreateMenu()
 
     MakeToggle(pRot, "Smart Fear", "SmartFear", 15, -185, 150)
     MakeToggle(pRot, "Smart Drain", "DrainSoulSmart", 175, -185, 150)
-    MakeToggle(pRot, "Auto Use Healthstone", "AutoHealthstone", 15, -215, 290)
-    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -260, 5, 50, 290)
+    MakeToggle(pRot, "Auto Healthstone", "AutoHealthstone", 15, -215, 150)
+    MakeSlider(pRot, "Stone @ %", "HealthstoneHP", 185, -215, 5, 95, 130)
+    MakeSlider(pRot, "Drain Soul Threshold", "DrainSoulHP", 20, -265, 5, 50, 290)
 
     -- Pet Tab
     MakeToggle(pPet, "Pet Assist Mode", "PetAssist", 20, 0, 290)
@@ -310,6 +312,8 @@ loader:SetScript("OnEvent", function()
     if event == "VARIABLES_LOADED" then
         if not WarlockCore_Config then WarlockCore_Config = {} end
         if WarlockCore_Config.FastAttack == nil then WarlockCore_Config.FastAttack = true end
+        if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
+        if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
         if WarlockCore_Config.SmartFear == nil then WarlockCore_Config.SmartFear = true end
         if WarlockCore_Config.DrainSoulSmart == nil then WarlockCore_Config.DrainSoulSmart = true end
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
