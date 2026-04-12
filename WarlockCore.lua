@@ -1,4 +1,4 @@
--- WarlockCore v1.3.0
+-- WarlockCore v1.4.0
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -6,6 +6,8 @@ if class ~= "WARLOCK" then return end
 
 local iconUpdateTick = 0
 local dragIconTex, dragPetIconTex
+local lastPetAttack, lastPetTargetName = 0, ""
+local myDots = {}
 
 local buffTextures = {
     ["Demon Armor"] = "Interface\\Icons\\Spell_Shadow_RagingScream",
@@ -52,7 +54,26 @@ end
 
 local function HasDebuff(unit, spell)
     local tx = WRC_GetSpellTexture(spell); local texture = "Interface\\Icons\\" .. tx
-    for i = 1, 16 do local dTex = UnitDebuff(unit, i); if not dTex then break end; if dTex == texture then return true end end
+    local exists = false
+    for i = 1, 16 do 
+        local dTex = UnitDebuff(unit, i)
+        if not dTex then break end
+        if dTex == texture then exists = true; break end 
+    end
+    
+    if not exists then return false end
+    
+    local record = myDots[spell]
+    if record and record.target == UnitName(unit) then
+        local elapsed = GetTime() - record.time
+        local dur = 20
+        if spell == "Corruption" then dur = 18
+        elseif spell == "Curse of Agony" then dur = 24
+        elseif spell == "Siphon Life" then dur = 30
+        elseif spell == "Immolate" then dur = 15
+        end
+        if elapsed < (dur - 1.5) then return true end
+    end
     return false
 end
 
@@ -99,11 +120,18 @@ function WarlockCore_Rotate()
     -- 3. Combat
     if WarlockCore_Config.PetAssist and UnitExists("pet") and UnitExists("target") and not UnitIsDead("target") then
         if not UnitIsUnit("target", "pettarget") then
-            PetDefensiveMode(); PetAttack()
+            local tName = UnitName("target")
+            if tName ~= lastPetTargetName or (GetTime() - lastPetAttack > 1.5) then
+                lastPetTargetName = tName; lastPetAttack = GetTime()
+                PetDefensiveMode(); PetAttack()
+            end
         end
     end
     local ns = GetNextSpell()
-    if ns and ns ~= "None" then CastSpellByName(ns) end
+    if ns and ns ~= "None" then 
+        CastSpellByName(ns)
+        myDots[ns] = { target = UnitName("target"), time = GetTime() }
+    end
 end
 
 function WarlockCore_Fear()
@@ -148,7 +176,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(380); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.4.0|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pInf = CreateTab()
