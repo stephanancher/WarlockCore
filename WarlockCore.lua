@@ -1,10 +1,10 @@
--- WarlockCore v1.7.2
+-- WarlockCore v1.7.3
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.7.2"
+local currentVer = "1.7.3"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -252,7 +252,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.2|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.3|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -288,8 +288,8 @@ local function CreateMenu()
         local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x, y - 6); l:SetText("|cff9482c9"..label.."|r")
         local b = CreateFrame("EditBox", "WRC_Edit_"..key, parent); b:SetWidth(w or 40); b:SetHeight(26); b:SetPoint("TOPLEFT", x + 40, y + 1); b:SetNumeric(true); b:SetMaxLetters(2); b:SetAutoFocus(false); b:SetText(WarlockCore_Config[key] or "25")
         b:SetFontObject("GameFontHighlightSmall"); b:SetTextInsets(8, 0, 0, 0); StyleButton(b)
-        b:SetScript("OnEnterPressed", function() WarlockCore_Config[key] = tonumber(this:GetText()) or 25; this:ClearFocus() end)
-        b:SetScript("OnEscapePressed", function() this:ClearFocus() end); b:SetScript("OnEditFocusLost", function() this:SetText(WarlockCore_Config[key] or "25") end)
+        b:SetScript("OnTextChanged", function() local v = tonumber(this:GetText()); if v then WarlockCore_Config[key] = v end end)
+        b:SetScript("OnEnterPressed", function() this:ClearFocus() end); b:SetScript("OnEscapePressed", function() this:ClearFocus() end)
     end
 
     -- Rotation Tab
