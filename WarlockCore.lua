@@ -1,4 +1,4 @@
--- WarlockCore v1.6.1
+-- WarlockCore v1.6.2
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -221,9 +221,9 @@ end
 local function CreateMenu()
     if WarlockCoreMenuFrame then return end
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
-    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
+    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(450); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.1|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.2|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -278,20 +278,27 @@ local function CreateMenu()
     MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 15, 0, warlockBuffs, 140)
 
     -- Options Tab
-    MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152)
-    MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152)
-    MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -30, 152)
-    MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -30, 45)
-    MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -60, 152)
-    MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -60, 45)
-    MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -90, 152)
-    MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -90, 152)
-    MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -120, 152)
-    MakeToggle(pOpt, "Debug Mode", "Debug", 175, -120, 152)
+    local function MakeLabel(p, t, x, y) local l = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x, y); l:SetText("|cff9482c9"..t.."|r"); return l end
     
-    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -160); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    MakeLabel(pOpt, "Combat: Smart Fear & Drain logic", 15, 0)
+    MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, -20, 152)
+    MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, -20, 152)
     
-    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -170, 5, 50, 290)
+    MakeLabel(pOpt, "Resources: Managed Healthstone & Tapping", 15, -60)
+    MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -80, 152)
+    MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -80, 45)
+    MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -110, 152)
+    MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -110, 45)
+    
+    MakeLabel(pOpt, "Automation: Pet & System controls", 15, -150)
+    MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -170, 152)
+    MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -170, 152)
+    MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -200, 152)
+    MakeToggle(pOpt, "Debug Mode", "Debug", 175, -200, 152)
+    
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -235); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -245, 5, 50, 290)
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="WarlockRot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="WarlockFear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
