@@ -1,10 +1,10 @@
--- WarlockCore v1.7.3
+-- WarlockCore v1.7.4
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.7.3"
+local currentVer = "1.7.4"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -252,7 +252,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.3|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.4|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -453,7 +453,7 @@ loader:SetScript("OnEvent", function()
             WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end)
             WarlockCoreMinimapButton:SetScript("OnEnter", function() 
                 GameTooltip:SetOwner(this, "ANCHOR_LEFT")
-                GameTooltip:AddLine("|cff9482c9WarlockCore|r")
+                GameTooltip:AddLine("|cff9482c9WarlockCore v" .. currentVer .. "|r")
                 GameTooltip:AddLine("Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested", 1, 1, 1)
                 GameTooltip:AddLine("Left-Click to toggle menu", 0.7, 0.7, 0.7)
                 GameTooltip:Show()
