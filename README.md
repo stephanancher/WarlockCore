@@ -1,34 +1,43 @@
-# WarlockCore v1.2.3 (Turtle WoW)
+# WarlockCore v1.6.9
+Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1).
 
-A premium combat rotation and utility addon for Warlocks on the Turtle WoW (1.12.1) client. Designed for maximum responsiveness, safety, and a beautiful dark aesthetic.
+WarlockCore is a high-performance combat suite designed to streamline Warlock gameplay with intelligent automation, resource management, and a premium 5-tab configuration interface.
 
 ## 🚀 Key Features
 
-- **Priority-Based Rotation**: Intelligent spell selection (Slot 1-4) with automatic debuff checking to prevent redundant casting.
-- **Immediate Pet Engagement**: Bypasses the 1.12 "casting lock" by sending the pet at the exact millisecond you press the macro, ensuring your pet and spells hit simultaneously.
-- **Safety Valve (Fast Attack Mode)**: Optional safety setting. When OFF, requires a hardware confirmation (two clicks) to initiate combat on a new target.
-- **Isolated Buff Logic**: Prioritizes Armor buffs (Demon Skin/Armor) without triggering attacks or targeting.
-- **Premium Dark UI**: A bespoke, shadow-purple "Void" interface with glassmorphism effects and custom buttons.
-- **Class Lock**: Automatically disables itself on non-Warlock characters to keep your UI clean.
+### 🧠 Smart Combat Logic
+- **Smart Fear**: Tracks mobs that are immune to Fear (e.g., undead, mechanicals) in real-time and automatically switches to Shadow Bolt when those mobs are targeted.
+- **Smart Drain**: Intelligent Drain Soul management with health threshold configuration to ensure clean soul shard generation.
+- **Immune Management**: Dynamic management of immune mobs via the "Info" tab.
 
-## 🛠 How to Use
+### 🩸 Resource Automation
+- **Auto Stone**: Automatically consumes a Healthstone at a user-defined Health % threshold.
+- **Auto Tap**: Intelligently uses Life Tap when mana is low, respecting a safety health threshold to ensure you never tap yourself into danger.
 
-1. **Installation**: Download the `WarlockCore` folder and place it in your `Interface\AddOns\` directory.
-2. **First Login**: Log in as a Warlock. You will see the purple Summon Imp icon on your minimap.
-3. **Setup Rotation**: 
-   - Open the menu by clicking the Minimap button.
-   - Go to the **Rotation** tab and select your spells.
-4. **The Macro**:
-   - Go to the **Info** tab.
-   - Drag the macro icon directly onto your Action Bar.
-   - (Alternatively, manually create a macro named `WarlockRot` with the text: `/script WarlockCore_Rotate()`).
-5. **Start Combat**: Simply press your Action Bar button. The addon will handle targeting, pet orders, and your optimized spell priority.
+### 🐾 Pet Intelligence
+- **Master Assist**: Toggleable pet automation that ensures your pet engages when you do.
+- **Smart Targets**: Automatically targets the nearest enemy when triggering your rotation if you don't have a target selected.
+- **Fast Attack**: High-priority charge command that sends your pet to the mob instantly on rotation start.
 
-## ⚙️ Settings
-- **Rotation**: Define your Opener and Priority list.
-- **Pet**: Toggle "Pet Assist" and "Fast Attack Mode".
-- **Buff**: Select your preferred Armor buff.
-- **Info**: Drag the macro, toggle Debug mode, or Reload UI.
+### 🎨 Premium Interface
+- **Unified 5-Tab UI**: Clean organization across **Rotation, Pet, Buff, Options, and Info** tabs.
+- **Interactive Tooltips**: Hover over any setting in the "Options" tab to see a detailed description of its function.
+- **Macro Sync**: Drag-and-drop macros (Rot & Fear) that automatically update their icons in real-time based on your current combat state.
+
+## 🛠 Installation
+1. Download the repository.
+2. Place the `WarlockCore` folder into your `C:\Games\TurtleWoW\Interface\AddOns\` directory.
+3. Restart or Reload your WoW client.
+
+## ⌨️ Commands
+- `/wrc`: Toggle the main configuration window.
+- `/wrc reset`: Clear the current list of tracked immune mobs.
+- `/wrc clear [Name]`: Remove a specific mob from the immunity list.
+
+## 📦 Dependencies
+- **None**. WarlockCore is a completely standalone addon built using native 1.12.1 API calls.
 
 ---
-*Created by stephanancher for the Turtle WoW community.*
+**Author**: Stephan
+**Version**: 1.6.9
+**Compatibility**: Turtle WoW (Vanilla 1.12.1)
