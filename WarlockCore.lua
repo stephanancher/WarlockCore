@@ -1,4 +1,4 @@
--- WarlockCore v1.6.0
+-- WarlockCore v1.6.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
@@ -223,7 +223,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.0|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.6.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -233,9 +233,9 @@ local function CreateMenu()
         if tab == 1 then pRot:Show(); btnRot:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 2 then pPet:Show(); btnPet:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 3 then pBuf:Show(); btnBuf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) elseif tab == 4 then pOpt:Show(); btnOpt:SetBackdropColor(0.3, 0.2, 0.5, 0.9) else pInf:Show(); btnInf:SetBackdropColor(0.3, 0.2, 0.5, 0.9) end
     end
     local function MakeTabBtn(txt, x, tab)
-        local b = CreateFrame("Button", nil, f); b:SetWidth(62); b:SetHeight(24); b:SetPoint("TOPLEFT", x, -40); StyleButton(b); local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); t:SetPoint("CENTER", 0, 0); t:SetText(txt); b:SetScript("OnClick", function() ShowTab(tab) end); return b
+        local b = CreateFrame("Button", nil, f); b:SetWidth(65); b:SetHeight(24); b:SetPoint("TOPLEFT", x, -40); StyleButton(b); local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); t:SetPoint("CENTER", 0, 0); t:SetText(txt); b:SetScript("OnClick", function() ShowTab(tab) end); return b
     end
-    btnRot = MakeTabBtn("Rot", 15, 1); btnPet = MakeTabBtn("Pet", 80, 2); btnBuf = MakeTabBtn("Buff", 145, 3); btnOpt = MakeTabBtn("Options", 210, 4); btnInf = MakeTabBtn("Info", 275, 5)
+    btnRot = MakeTabBtn("Rot", 12, 1); btnPet = MakeTabBtn("Pet", 79, 2); btnBuf = MakeTabBtn("Buff", 146, 3); btnOpt = MakeTabBtn("Options", 213, 4); btnInf = MakeTabBtn("Info", 280, 5)
     local function MakeDrop(parent, label, key, x, y, list, width)
         local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); l:SetPoint("TOPLEFT", x + 15, y); l:SetText("|cff9482c9"..label.."|r")
         local d = CreateFrame("Frame", "WRC_Drop_" .. key, parent, "UIDropDownMenuTemplate"); d:SetPoint("TOPLEFT", x, y - 15); UIDropDownMenu_SetWidth(width or 100, d)
@@ -280,9 +280,9 @@ local function CreateMenu()
     -- Options Tab
     MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152)
     MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152)
-    MakeToggle(pOpt, "Auto Healthstone", "AutoHealthstone", 15, -30, 170)
+    MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -30, 152)
     MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -30, 45)
-    MakeToggle(pOpt, "Auto Life Tap", "AutoLifeTap", 15, -60, 170)
+    MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -60, 152)
     MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -60, 45)
     MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -90, 152)
     MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -90, 152)
