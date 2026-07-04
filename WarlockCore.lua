@@ -41,7 +41,8 @@ local petIcons = {
     ["Felhunter"] = "Spell_Shadow_SummonFelhunter"
 }
 
-local warlockSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
+local warlockOpenerSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
+local warlockRotationSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear", "Shoot" }
 local warlockBuffs = { "None", "Demon Skin", "Demon Armor" }
 local warlockPets = { "None", "Imp", "Voidwalker", "Succubus", "Felhunter" }
 
@@ -149,7 +150,7 @@ local function GetNextSpell()
             else return s end
         end
     end
-    return "Shadow Bolt"
+    return "None"
 end
 
 function WarlockCore_Rotate()
@@ -190,7 +191,7 @@ function WarlockCore_Rotate()
             local tName = UnitName("target")
             if tName ~= lastPetTargetName or (GetTime() - lastPetAttack > 1.5) then
                 lastPetTargetName = tName; lastPetAttack = GetTime()
-                PetDefensiveMode(); PetAttack()
+                PetAttack()
             end
         end
     end
@@ -293,11 +294,11 @@ local function CreateMenu()
     end
 
     -- Rotation Tab
-    MakeDrop(pRot, "Opener:", "Opener", 90, 0, warlockSpells, 130)
-    MakeDrop(pRot, "Slot 1:", "Rotation1", 5, -60, warlockSpells, 120)
-    MakeDrop(pRot, "Slot 2:", "Rotation2", 175, -60, warlockSpells, 120)
-    MakeDrop(pRot, "Slot 3:", "Rotation3", 5, -120, warlockSpells, 120)
-    MakeDrop(pRot, "Slot 4:", "Rotation4", 175, -120, warlockSpells, 120)
+    MakeDrop(pRot, "Opener:", "Opener", 90, 0, warlockOpenerSpells, 130)
+    MakeDrop(pRot, "Slot 1:", "Rotation1", 5, -60, warlockRotationSpells, 120)
+    MakeDrop(pRot, "Slot 2:", "Rotation2", 175, -60, warlockRotationSpells, 120)
+    MakeDrop(pRot, "Slot 3:", "Rotation3", 5, -120, warlockRotationSpells, 120)
+    MakeDrop(pRot, "Slot 4:", "Rotation4", 175, -120, warlockRotationSpells, 120)
 
     -- Pet Tab
     MakeDrop(pPet, "Selected Pet:", "SelectedPet", 10, 0, warlockPets, 140)

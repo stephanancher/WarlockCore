@@ -1,4 +1,4 @@
-WarlockCore v1.6.9
+WarlockCore v1.7.4
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1)
 
 ================================================================================
@@ -66,5 +66,5 @@ NONE. Standalone and lightweight.
 CONTACT & VERSION
 ================================================================================
 Author: Stephan
-Version: 1.6.9
+Version: 1.7.4
 Compatibility: Turtle WoW (1.12.1)
