@@ -1,10 +1,10 @@
--- WarlockCore v1.7.4
+-- WarlockCore v1.8.0
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.7.4"
+local currentVer = "1.8.0"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -71,6 +71,20 @@ end
 local function HasBuff(unit, spell)
     local tex = buffTextures[spell]; if not tex then return false end
     for i = 1, 32 do local bTex = UnitBuff(unit, i); if not bTex then break end; if bTex == tex then return true end end
+    return false
+end
+
+local function WRC_IsSpellReady(spellName)
+    for i = 1, 250 do
+        local name = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+        if name == spellName then
+            local start, duration, enable = GetSpellCooldown(i, BOOKTYPE_SPELL)
+            if enable == 0 then return false end
+            if duration and duration > 0 then return false end
+            return true
+        end
+    end
     return false
 end
 
@@ -208,7 +222,8 @@ function WarlockCore_Fear()
     if not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target") then return end
     
     local name = UnitName("target")
-    if WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] then
+    local isPlayerTarget = UnitIsPlayer("target")
+    if WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] and not isPlayerTarget then
         dbg("Target is IMMUNE to Fear! Casting Shadow Bolt instead.")
         WarlockCore_LastAttempt = "Shadow Bolt"; CastSpellByName("Shadow Bolt"); return
     end
@@ -218,6 +233,10 @@ end
 
 function WarlockCore_Summon()
     if not WarlockCore_Config or not WarlockCore_Config.SelectedPet or WarlockCore_Config.SelectedPet == "None" then return end
+    if WarlockCore_Config.AutoFelDomination and WRC_IsSpellReady("Fel Domination") then
+        CastSpellByName("Fel Domination")
+        return
+    end
     CastSpellByName("Summon " .. WarlockCore_Config.SelectedPet)
 end
 
@@ -237,15 +256,28 @@ local function GetImmList()
     return list 
 end
 
+local function GetMinimapButtonRadius()
+    local minimapSize = Minimap:GetWidth() or 140
+    return math.max(70, math.min(90, minimapSize / 2 + 8))
+end
+
 function WarlockCore_Minimap_UpdatePosition()
     if not WarlockCore_Config or not WarlockCore_Config.MinimapPos then return end
     local angle = math.rad(WarlockCore_Config.MinimapPos)
-    WarlockCoreMinimapButton:ClearAllPoints(); WarlockCoreMinimapButton:SetPoint("CENTER", "Minimap", "CENTER", math.cos(angle)*80, math.sin(angle)*80)
+    local radius = GetMinimapButtonRadius()
+    WarlockCoreMinimapButton:ClearAllPoints(); WarlockCoreMinimapButton:SetPoint("CENTER", "Minimap", "CENTER", math.cos(angle)*radius, math.sin(angle)*radius)
 end
 function WarlockCore_Minimap_OnUpdate()
     local x, y = GetCursorPosition(); local sc = Minimap:GetEffectiveScale(); local xm, ym = Minimap:GetLeft(), Minimap:GetBottom()
     x = x / sc; y = y / sc; local mx = xm + Minimap:GetWidth() / 2; local my = ym + Minimap:GetHeight() / 2
-    WarlockCore_Config.MinimapPos = math.deg(math.atan2(y - my, x - mx)); WarlockCore_Minimap_UpdatePosition()
+    local dx, dy = x - mx, y - my
+    local distance = math.sqrt(dx*dx + dy*dy)
+    local maxDistance = GetMinimapButtonRadius()
+    if distance > maxDistance then
+        local scale = maxDistance / distance
+        dx = dx * scale; dy = dy * scale
+    end
+    WarlockCore_Config.MinimapPos = math.deg(math.atan2(dy, dx)); WarlockCore_Minimap_UpdatePosition()
 end
 
 local function CreateMenu()
@@ -253,7 +285,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.7.4|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.0|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -322,7 +354,8 @@ local function CreateMenu()
     local st = MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -105, 152); SetTip(st, "Automatically targets the nearest enemy when pressing Rotation if you don't have a target.")
     
     local fa = MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -140, 152); SetTip(fa, "Sets style: Charges immediately when ON; waits for your spell hit when OFF. (Requires Pet Assist ON)")
-    local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 175, -140, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
+    local afd = MakeToggle(pOpt, "Auto Fel Domination", "AutoFelDomination", 175, -140, 152); SetTip(afd, "Automatically casts Fel Domination when you summon a pet and the buff is active.")
+    local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 15, -175, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
     
     local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -180); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
     
@@ -383,6 +416,7 @@ loader:SetScript("OnEvent", function()
     if event == "VARIABLES_LOADED" then
         if not WarlockCore_Config then WarlockCore_Config = {} end
         if WarlockCore_Config.FastAttack == nil then WarlockCore_Config.FastAttack = true end
+        if WarlockCore_Config.AutoFelDomination == nil then WarlockCore_Config.AutoFelDomination = true end
         if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
         if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
         if WarlockCore_Config.LifeTapHP == nil then WarlockCore_Config.LifeTapHP = 40 end
@@ -394,7 +428,8 @@ loader:SetScript("OnEvent", function()
     elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" or event == "UI_ERROR_MESSAGE" then
         if arg1 and string.find(string.lower(arg1), "immune") then
             local name = UnitName("target")
-            if name and WarlockCore_LastAttempt == "Fear" then
+            local isPlayerTarget = UnitIsPlayer("target")
+            if name and not isPlayerTarget and WarlockCore_LastAttempt == "Fear" then
                 if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
                 if not WarlockCore_Config.ImmuneMobs[name] then
                     WarlockCore_Config.ImmuneMobs[name] = true
@@ -451,7 +486,7 @@ loader:SetScript("OnEvent", function()
             end
         end
         if not WarlockCoreMinimapButton then
-            WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:SetScript("OnUpdate", nil) end)
+            WarlockCoreMinimapButton = CreateFrame("Button", "WarlockCoreMinimapButton", Minimap); WarlockCoreMinimapButton:SetWidth(32); WarlockCoreMinimapButton:SetHeight(32); WarlockCoreMinimapButton:SetFrameLevel(Minimap:GetFrameLevel() + 5); WarlockCoreMinimapButton:EnableMouse(true); WarlockCoreMinimapButton:SetMovable(true); WarlockCoreMinimapButton:RegisterForDrag("LeftButton"); local ic = WarlockCoreMinimapButton:CreateTexture(nil, "ARTWORK"); ic:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); ic:SetPoint("CENTER", 0, 0); ic:SetWidth(20); ic:SetHeight(20); ic:SetTexCoord(0.08, 0.92, 0.08, 0.92); local bd = WarlockCoreMinimapButton:CreateTexture(nil, "OVERLAY"); bd:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); bd:SetWidth(52); bd:SetHeight(52); bd:SetPoint("TOPLEFT", 0, 0); WarlockCoreMinimapButton:SetScript("OnClick", function() if not WarlockCoreMenuFrame then CreateMenu() end; if WarlockCoreMenuFrame:IsShown() then WarlockCoreMenuFrame:Hide() else WarlockCoreMenuFrame:Show() end end); WarlockCoreMinimapButton:SetScript("OnDragStart", function() this:StartMoving(); this:SetScript("OnUpdate", WarlockCore_Minimap_OnUpdate) end); WarlockCoreMinimapButton:SetScript("OnDragStop", function() this:StopMovingOrSizing(); this:SetScript("OnUpdate", nil) end)
             WarlockCoreMinimapButton:SetScript("OnEnter", function() 
                 GameTooltip:SetOwner(this, "ANCHOR_LEFT")
                 GameTooltip:AddLine("|cff9482c9WarlockCore v" .. currentVer .. "|r")
