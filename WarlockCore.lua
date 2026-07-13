@@ -1,10 +1,10 @@
--- WarlockCore v1.8.0
+-- WarlockCore v1.8.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.8.0"
+local currentVer = "1.8.1"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -32,7 +32,8 @@ local myDots = {}
 
 local buffTextures = {
     ["Demon Armor"] = "Interface\\Icons\\Spell_Shadow_RagingScream",
-    ["Demon Skin"] = "Interface\\Icons\\Spell_Shadow_DemonSkin"
+    ["Demon Skin"] = "Interface\\Icons\\Spell_Shadow_DemonSkin",
+    ["Unending Breath"] = "Interface\\Icons\\Spell_Shadow_DemonBreath"
 }
 local petIcons = {
     ["Imp"] = "Spell_Shadow_SummonImp",
@@ -43,7 +44,7 @@ local petIcons = {
 
 local warlockOpenerSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
 local warlockRotationSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear", "Shoot" }
-local warlockBuffs = { "None", "Demon Skin", "Demon Armor" }
+local warlockBuffs = { "None", "Demon Skin", "Demon Armor", "Unending Breath" }
 local warlockPets = { "None", "Imp", "Voidwalker", "Succubus", "Felhunter" }
 
 -- --- Helpers ---
@@ -68,10 +69,45 @@ local function WRC_GetMacroIndex(name)
     return 0
 end
 
+local function WRC_NormalizeAuraName(value)
+    if not value then return "" end
+    local normalized = string.lower(value)
+    normalized = string.gsub(normalized, "\\", "/")
+    local _, _, short = string.find(normalized, "([^/]+)$")
+    if short then return short end
+    return normalized
+end
+
 local function HasBuff(unit, spell)
     local tex = buffTextures[spell]; if not tex then return false end
-    for i = 1, 32 do local bTex = UnitBuff(unit, i); if not bTex then break end; if bTex == tex then return true end end
+    local candidates = { WRC_NormalizeAuraName(spell) }
+    if tex then table.insert(candidates, WRC_NormalizeAuraName(tex)) end
+    local _, _, short = string.find(string.lower(tex or ""), "([^/]+)$")
+    if short then table.insert(candidates, short) end
+    for i = 1, 32 do
+        local bTex = UnitBuff(unit, i)
+        if not bTex then break end
+        local normalized = WRC_NormalizeAuraName(bTex)
+        for _, candidate in ipairs(candidates) do
+            if normalized == candidate then return true end
+        end
+    end
     return false
+end
+
+local function WRC_HasShadowTrance()
+    -- The legacy client aura API only exposes buff textures. Shadow Trance
+    -- (the Nightfall proc) uses the Spell_Shadow_Twilight icon.
+    for i = 1, 32 do
+        local texture = UnitBuff("player", i)
+        if not texture then break end
+        if WRC_NormalizeAuraName(texture) == "spell_shadow_twilight" then return true end
+    end
+    return false
+end
+
+local function WRC_ShouldUseNightfallBolt()
+    return WarlockCore_Config and WarlockCore_Config.NightfallShadowBolt and WRC_HasShadowTrance()
 end
 
 local function WRC_IsSpellReady(spellName)
@@ -149,6 +185,7 @@ end
 
 local function GetNextSpell()
     if not WarlockCore_Config then return "None" end
+    if WRC_ShouldUseNightfallBolt() then return "Shadow Bolt" end
     if not UnitAffectingCombat("player") then return WarlockCore_Config.Opener or "None" end
     local s1, s2, s3, s4 = WarlockCore_Config.Rotation1, WarlockCore_Config.Rotation2, WarlockCore_Config.Rotation3, WarlockCore_Config.Rotation4
     local slots = { s1, s2, s3, s4 }
@@ -169,6 +206,20 @@ end
 
 function WarlockCore_Rotate()
     if not WarlockCore_Config then return end
+
+    -- Nightfall is a short proc, so consume it before every other rotation
+    -- action, including emergency items, Life Tap, and maintenance buffs.
+    if WRC_ShouldUseNightfallBolt() then
+        if WarlockCore_Config.SmartTargeting and (not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target")) then
+            TargetNearestEnemy()
+        end
+        if UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
+            dbg("Shadow Trance active! Casting Shadow Bolt.")
+            WarlockCore_LastAttempt = "Shadow Bolt"
+            CastSpellByName("Shadow Bolt")
+            return
+        end
+    end
     
     -- 0. Emergency Healthstone
     local hsHP = WarlockCore_Config.HealthstoneHP or 25
@@ -220,6 +271,11 @@ end
 function WarlockCore_Fear()
     if not WarlockCore_Config then return end
     if not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target") then return end
+
+    if WRC_ShouldUseNightfallBolt() then
+        dbg("Shadow Trance active! Casting Shadow Bolt instead of Fear.")
+        WarlockCore_LastAttempt = "Shadow Bolt"; CastSpellByName("Shadow Bolt"); return
+    end
     
     local name = UnitName("target")
     local isPlayerTarget = UnitIsPlayer("target")
@@ -285,7 +341,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.0|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -356,10 +412,11 @@ local function CreateMenu()
     local fa = MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -140, 152); SetTip(fa, "Sets style: Charges immediately when ON; waits for your spell hit when OFF. (Requires Pet Assist ON)")
     local afd = MakeToggle(pOpt, "Auto Fel Domination", "AutoFelDomination", 175, -140, 152); SetTip(afd, "Automatically casts Fel Domination when you summon a pet and the buff is active.")
     local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 15, -175, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
+    local nb = MakeToggle(pOpt, "Nightfall Bolt", "NightfallShadowBolt", 175, -175, 152); SetTip(nb, "When Shadow Trance procs, Rot and Fear cast Shadow Bolt before anything else.")
     
-    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -180); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
-    
-    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -190, 5, 50, 290)
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -210); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -220, 5, 50, 290)
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
@@ -400,7 +457,7 @@ loader:SetScript("OnUpdate", function()
     local fIdx = WRC_GetMacroIndex("Fear"); if fIdx > 0 then
         local fIcon = "Spell_Shadow_Possession"
         local name = UnitName("target")
-        if name and WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs[name] then fIcon = "Spell_Shadow_ShadowBolt" end
+        if WRC_ShouldUseNightfallBolt() or (name and WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs[name]) then fIcon = "Spell_Shadow_ShadowBolt" end
         EditMacro(fIdx, "Fear", fIcon, "/script WarlockCore_Fear()", nil, nil)
     end
     local sIdx = WRC_GetMacroIndex("WarlockSummon"); if sIdx > 0 then
@@ -422,6 +479,7 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.LifeTapHP == nil then WarlockCore_Config.LifeTapHP = 40 end
         if WarlockCore_Config.AutoLifeTap == nil then WarlockCore_Config.AutoLifeTap = true end
         if WarlockCore_Config.SmartFear == nil then WarlockCore_Config.SmartFear = true end
+        if WarlockCore_Config.NightfallShadowBolt == nil then WarlockCore_Config.NightfallShadowBolt = true end
         if WarlockCore_Config.DrainSoulSmart == nil then WarlockCore_Config.DrainSoulSmart = true end
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
         if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
