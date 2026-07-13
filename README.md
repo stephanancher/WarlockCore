@@ -7,6 +7,7 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 
 ### 🧠 Smart Combat Logic
 - **Smart Fear**: Tracks mobs that are immune to Fear (e.g., undead, mechanicals) in real-time and automatically switches to Shadow Bolt when those mobs are targeted.
+- **Nightfall Bolt**: Detects the Shadow Trance buff from Nightfall and makes your next **Rot** or **Fear** press cast Shadow Bolt before every other action.
 - **Smart Drain**: Intelligent Drain Soul management with health threshold configuration to ensure clean soul shard generation.
 - **Immune Management**: Dynamic management of immune mobs via the "Info" tab.
 
@@ -28,6 +29,7 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 Every setting in the **Options** tab is designed to give you full control over the combat automation:
 
 - **Smart Fear**: Remembers immune mobs (Undead/Mechanical/Bosses) and automatically skips Fear on them to save mana.
+- **Nightfall Bolt**: When ON, Shadow Trance overrides both Rot and Fear with Shadow Bolt on your next keypress. Turn it OFF to keep the normal rotation and Fear behavior during Nightfall procs.
 - **Smart Drain**: Intelligently manages Drain Soul rank switching and power conflicts for seamless shard farming.
 - **Auto Stone**: Uses your Healthstone automatically when your Health falls below your chosen %; simply enter the threshold in the textbox.
 - **Auto Tap**: Intelligently uses Life Tap during your rotation if your mana is low, provided your health is above your safety %; enter the safety threshold in the textbox.

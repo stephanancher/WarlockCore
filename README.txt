@@ -14,6 +14,8 @@ KEY FEATURES
 
 SMART COMBAT LOGIC:
 - Smart Fear: Tracks immune mobs and automatically skips Fear on them.
+- Nightfall Bolt: Shadow Trance makes the next Rot or Fear press cast Shadow Bolt
+  before every other action.
 - Smart Drain: Intelligent Drain Soul management.
 - Immune Management: Dynamic management of immune mobs via the "Info" tab.
 
@@ -35,6 +37,8 @@ PREMIUM INTERFACE:
 DETAILED OPTIONS REFERENCE (OPTIONS TAB)
 ================================================================================
 - Smart Fear     : Skips Fear on immune targets (Undead/Mech) to save mana.
+- Nightfall Bolt : When ON, Shadow Trance overrides the next Rot or Fear press
+                   with Shadow Bolt. OFF keeps their normal behavior.
 - Smart Drain    : Manages Drain Soul rank conflicts for smooth farming.
 - Auto Stone     : Automatically uses Healthstone at the chosen HP %.
 - Auto Tap       : Safe Life Tap logic (checks both mana and health).
