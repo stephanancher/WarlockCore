@@ -1,4 +1,4 @@
-WarlockCore v1.8.1
+WarlockCore v1.8.3
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1)
 
 ================================================================================
@@ -16,11 +16,12 @@ SMART COMBAT LOGIC:
 - Smart Fear: Tracks immune mobs and automatically skips Fear on them.
 - Nightfall Bolt: Shadow Trance makes the next Rot or Fear press cast Shadow Bolt
   before every other action.
-- Smart Drain: Intelligent Drain Soul management.
+- Smart Drain: Always forces Drain Soul at its HP threshold without disabling its normal slot.
 - Immune Management: Dynamic management of immune mobs via the "Info" tab.
 
 RESOURCE AUTOMATION:
 - Auto Stone: Consumes Healthstones at a custom Health % threshold.
+- Soulstone: Out of combat, uses a Soulstone when its buff is missing and creates a replacement when possible.
 - Auto Tap: Safe mana-management logic via Life Tap.
 
 PET INTELLIGENCE:
@@ -39,7 +40,7 @@ DETAILED OPTIONS REFERENCE (OPTIONS TAB)
 - Smart Fear     : Skips Fear on immune targets (Undead/Mech) to save mana.
 - Nightfall Bolt : When ON, Shadow Trance overrides the next Rot or Fear press
                    with Shadow Bolt. OFF keeps their normal behavior.
-- Smart Drain    : Manages Drain Soul rank conflicts for smooth farming.
+- Smart Drain    : Forces Drain Soul at its threshold; above it, the slot works normally.
 - Auto Stone     : Automatically uses Healthstone at the chosen HP %.
 - Auto Tap       : Safe Life Tap logic (checks both mana and health).
 - Pet Assist     : Master Switch. When OFF, addon will NOT touch pet bar.
@@ -70,5 +71,5 @@ NONE. Standalone and lightweight.
 CONTACT & VERSION
 ================================================================================
 Author: Stephan
-Version: 1.8.1
+Version: 1.8.3
 Compatibility: Turtle WoW (1.12.1)
