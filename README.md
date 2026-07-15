@@ -24,7 +24,8 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 ### 🎨 Premium Interface
 - **Unified 5-Tab UI**: Clean organization across **Rotation, Pet, Buff, Options, and Info** tabs.
 - **Interactive Tooltips**: Hover over any setting in the "Options" tab to see a detailed description of its function.
-- **Macro Sync**: Drag-and-drop macros (Rot & Fear) that automatically update their icons in real-time based on your current combat state.
+- **Macro Sync**: Character-specific drag-and-drop macros for Rot, Fear, and pet summoning that automatically update their icons in real-time.
+- **Personal Drain Macros**: Drag separate Drain Life and Drain Soul macros that ignore repeated presses until the active channel has about 0.3 seconds remaining.
 
 ## ⚙️ Configuration Options (Options Tab)
 Every setting in the **Options** tab is designed to give you full control over the combat automation:
@@ -32,6 +33,7 @@ Every setting in the **Options** tab is designed to give you full control over t
 - **Smart Fear**: Remembers immune mobs (Undead/Mechanical/Bosses) and automatically skips Fear on them to save mana.
 - **Nightfall Bolt**: When ON, Shadow Trance overrides both Rot and Fear with Shadow Bolt on your next keypress. Turn it OFF to keep the normal rotation and Fear behavior during Nightfall procs.
 - **Smart Drain**: Overrides the normal slot order with Drain Soul at the chosen target-health threshold, while Drain Soul still casts normally when its slot is reached above the threshold. Nightfall Shadow Bolt keeps first priority.
+- **Drain Soul**: Master switch that can disable Drain Soul as opener, in every rotation slot, and at the health threshold.
 - **Auto Stone**: Uses your Healthstone automatically when your Health falls below your chosen %; simply enter the threshold in the textbox.
 - **Auto Tap**: Intelligently uses Life Tap during your rotation if your mana is low, provided your health is above your safety %; enter the safety threshold in the textbox.
 - **Pet Assist**: The "Master Switch" for pet automation. When ON, the addon handles pet attacks; when OFF, you control the pet manually.

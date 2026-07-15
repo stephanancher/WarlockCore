@@ -32,7 +32,8 @@ PET INTELLIGENCE:
 PREMIUM INTERFACE:
 - Unified 5-Tab UI: Rot, Pet, Buff, Options, and Info tabs.
 - Interactive Tooltips: Hover descriptions in the Options tab.
-- Macro Sync: Real-time icon updating for Rot and Fear macros.
+- Macro Sync: Character-specific Rot, Fear, and pet macros with real-time icons.
+- Personal Drain Macros: Spam-safe Drain Life and Drain Soul character macros.
 
 ================================================================================
 DETAILED OPTIONS REFERENCE (OPTIONS TAB)
@@ -41,6 +42,7 @@ DETAILED OPTIONS REFERENCE (OPTIONS TAB)
 - Nightfall Bolt : When ON, Shadow Trance overrides the next Rot or Fear press
                    with Shadow Bolt. OFF keeps their normal behavior.
 - Smart Drain    : Forces Drain Soul at its threshold; above it, the slot works normally.
+- Drain Soul     : Master switch; OFF skips opener, rotation slots, and threshold.
 - Auto Stone     : Automatically uses Healthstone at the chosen HP %.
 - Auto Tap       : Safe Life Tap logic (checks both mana and health).
 - Pet Assist     : Master Switch. When OFF, addon will NOT touch pet bar.

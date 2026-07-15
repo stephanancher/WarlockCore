@@ -31,6 +31,8 @@ local lastPetAttack, lastPetTargetName = 0, ""
 local lastSoulstoneBagWarning = -10
 local lastSoulstoneShardWarning = -10
 local lastSoulstoneSpellWarning = -10
+local activeDrainChannel, drainChannelEndTime = nil, 0
+local pendingDrainChannel, pendingDrainChannelUntil = nil, 0
 local myDots = {}
 
 local buffTextures = {
@@ -69,8 +71,37 @@ local function WRC_GetSpellTexture(name)
 end
 
 local function WRC_GetMacroIndex(name)
-    local numGeneral, numChar = GetNumMacros(); for i = 1, numGeneral + numChar do local mName = GetMacroInfo(i); if mName == name then return i end end
+    local numGeneral, numChar = GetNumMacros()
+    for i = 1, numGeneral do
+        local macroName = GetMacroInfo(i)
+        if macroName == name then return i end
+    end
+    local characterStart = (MAX_ACCOUNT_MACROS or 18) + 1
+    for i = characterStart, characterStart + numChar - 1 do
+        local macroName = GetMacroInfo(i)
+        if macroName == name then return i end
+    end
     return 0
+end
+
+local function WRC_GetCharacterMacroIndex(name)
+    local _, numChar = GetNumMacros()
+    local characterStart = (MAX_ACCOUNT_MACROS or 18) + 1
+    for i = characterStart, characterStart + numChar - 1 do
+        local macroName = GetMacroInfo(i)
+        if macroName == name then return i end
+    end
+    return 0
+end
+
+local function WRC_CreateCharacterMacro(name, icon, body)
+    local index = WRC_GetCharacterMacroIndex(name)
+    if index == 0 then index = WRC_GetMacroIndex(name) end
+    if index == 0 then
+        return CreateMacro(name, icon, body, nil, 1)
+    end
+    EditMacro(index, name, icon, body, nil, 1)
+    return WRC_GetCharacterMacroIndex(name)
 end
 
 local function WRC_NormalizeAuraName(value)
@@ -332,13 +363,17 @@ end
 local function GetNextSpell()
     if not WarlockCore_Config then return "None" end
     if WRC_ShouldUseNightfallBolt() then return "Shadow Bolt" end
-    if not UnitAffectingCombat("player") then return WarlockCore_Config.Opener or "None" end
+    if not UnitAffectingCombat("player") then
+        local opener = WarlockCore_Config.Opener or "None"
+        if opener == "Drain Soul" and WarlockCore_Config.DrainSoulEnabled == false then return "None" end
+        return opener
+    end
     local s1, s2, s3, s4, s5 = WarlockCore_Config.Rotation1, WarlockCore_Config.Rotation2, WarlockCore_Config.Rotation3, WarlockCore_Config.Rotation4, WarlockCore_Config.Rotation5
     local slots = { s1, s2, s3, s4, s5 }
 
     -- Drain Soul threshold overrides normal slot order. It does not depend on
     -- Drain Soul being configured in a slot. Nightfall remains above it.
-    if WarlockCore_Config.DrainSoulSmart and UnitExists("target") and UnitHealthMax("target") > 0 then
+    if WarlockCore_Config.DrainSoulEnabled ~= false and WarlockCore_Config.DrainSoulSmart and UnitExists("target") and UnitHealthMax("target") > 0 then
         local targetHP = (UnitHealth("target") / UnitHealthMax("target")) * 100
         local threshold = WarlockCore_Config.DrainSoulHP or 20
         if targetHP <= threshold then
@@ -349,7 +384,9 @@ local function GetNextSpell()
 
     for _, s in ipairs(slots) do
         if s and s ~= "None" then
-            if s == "Immolate" or s == "Corruption" or s == "Curse of Agony" or s == "Siphon Life" or s == "Drain Life" or s == "Drain Soul" then
+            if s == "Drain Soul" and WarlockCore_Config.DrainSoulEnabled == false then
+                -- Drain Soul master switch is OFF; continue to the next slot.
+            elseif s == "Immolate" or s == "Corruption" or s == "Curse of Agony" or s == "Siphon Life" or s == "Drain Life" or s == "Drain Soul" then
                 if not HasDebuff("target", s) then return s end
             else return s end
         end
@@ -442,6 +479,23 @@ function WarlockCore_Fear()
     end
     
     WarlockCore_LastAttempt = "Fear"; CastSpellByName("Fear")
+end
+
+local function WRC_CastDrainChannel(spellName)
+    local now = GetTime()
+    if activeDrainChannel == spellName and now < drainChannelEndTime - 0.3 then return end
+    if pendingDrainChannel == spellName and now < pendingDrainChannelUntil then return end
+    pendingDrainChannel = spellName
+    pendingDrainChannelUntil = now + 0.3
+    CastSpellByName(spellName)
+end
+
+function WarlockCore_DrainLife()
+    WRC_CastDrainChannel("Drain Life")
+end
+
+function WarlockCore_DrainSoul()
+    WRC_CastDrainChannel("Drain Soul")
 end
 
 function WarlockCore_Summon()
@@ -548,7 +602,7 @@ local function CreateMenu()
 
     -- Pet Tab
     MakeDrop(pPet, "Selected Pet:", "SelectedPet", 10, 0, warlockPets, 140)
-    local dragPet = CreateFrame("Button", nil, pPet); dragPet:SetWidth(50); dragPet:SetHeight(50); dragPet:SetPoint("TOPLEFT", 20,-60); StyleButton(dragPet); dragPetIconTex = dragPet:CreateTexture(nil, "OVERLAY"); dragPetIconTex:SetPoint("TOPLEFT", 4,-4); dragPetIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragPetIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); dragPet:RegisterForDrag("LeftButton"); dragPet:SetScript("OnDragStart", function() local n="WarlockSummon"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Summon()"; local ic=petIcons[WarlockCore_Config.SelectedPet or "Imp"] or "Spell_Shadow_SummonImp"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragPet = CreateFrame("Button", nil, pPet); dragPet:SetWidth(50); dragPet:SetHeight(50); dragPet:SetPoint("TOPLEFT", 20,-60); StyleButton(dragPet); dragPetIconTex = dragPet:CreateTexture(nil, "OVERLAY"); dragPetIconTex:SetPoint("TOPLEFT", 4,-4); dragPetIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragPetIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); dragPet:RegisterForDrag("LeftButton"); dragPet:SetScript("OnDragStart", function() local n="WarlockSummon"; local b="/script WarlockCore_Summon()"; local ic=petIcons[WarlockCore_Config.SelectedPet or "Imp"] or "Spell_Shadow_SummonImp"; local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragPetL = pPet:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragPetL:SetPoint("TOPLEFT", 20, -115); dragPetL:SetText("Drag Macro: Summon")
 
     -- Buff Tab
@@ -572,14 +626,19 @@ local function CreateMenu()
     local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 15, -175, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
     local nb = MakeToggle(pOpt, "Nightfall Bolt", "NightfallShadowBolt", 175, -175, 152); SetTip(nb, "When Shadow Trance procs, Rot and Fear cast Shadow Bolt before anything else.")
     local ss = MakeToggle(pOpt, "Soulstone", "AutoSoulstone", 15, -210, 152); SetTip(ss, "Out of combat: uses a Soulstone if the buff is missing, then creates a replacement when possible.")
+    local ds = MakeToggle(pOpt, "Drain Soul", "DrainSoulEnabled", 175, -210, 152); SetTip(ds, "Master switch for Drain Soul. OFF skips it as opener, in rotation slots, and at the health threshold.")
     
     local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -245); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
 
     MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -255, 5, 50, 290)
     -- Info Tab
-    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
-    local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local idx=WRC_GetMacroIndex(n); local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; if idx==0 then idx=CreateMacro(n, ic, b, nil, nil) else EditMacro(idx, n, ic, b, nil, nil) end; if idx and idx > 0 then PickupMacro(idx) end end)
+    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
+
+    local dragDrainLife = CreateFrame("Button", nil, pInf); dragDrainLife:SetWidth(50); dragDrainLife:SetHeight(50); dragDrainLife:SetPoint("TOPLEFT", 175,-10); StyleButton(dragDrainLife); local dragDrainLifeTex = dragDrainLife:CreateTexture(nil, "OVERLAY"); dragDrainLifeTex:SetPoint("TOPLEFT", 4,-4); dragDrainLifeTex:SetPoint("BOTTOMRIGHT", -4,4); dragDrainLifeTex:SetTexture("Interface\\Icons\\" .. WRC_GetSpellTexture("Drain Life")); dragDrainLife:RegisterForDrag("LeftButton"); dragDrainLife:SetScript("OnDragStart", function() local n="WRC DrainLife"; local b="/script WarlockCore_DrainLife()"; local ic=WRC_GetSpellTexture("Drain Life"); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragDrainSoul = CreateFrame("Button", nil, pInf); dragDrainSoul:SetWidth(50); dragDrainSoul:SetHeight(50); dragDrainSoul:SetPoint("TOPLEFT", 235,-10); StyleButton(dragDrainSoul); local dragDrainSoulTex = dragDrainSoul:CreateTexture(nil, "OVERLAY"); dragDrainSoulTex:SetPoint("TOPLEFT", 4,-4); dragDrainSoulTex:SetPoint("BOTTOMRIGHT", -4,4); dragDrainSoulTex:SetTexture("Interface\\Icons\\" .. WRC_GetSpellTexture("Drain Soul")); dragDrainSoul:RegisterForDrag("LeftButton"); dragDrainSoul:SetScript("OnDragStart", function() local n="WRC DrainSoul"; local b="/script WarlockCore_DrainSoul()"; local ic=WRC_GetSpellTexture("Drain Soul"); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
+    local dragDrainL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragDrainL:SetPoint("TOPLEFT", 175, -65); dragDrainL:SetText("Personal: Life & Soul")
 
     MakeDrop(pInf, "Immune Mobs:", "SelectedImmune", 10, -100, GetImmList(), 100)
 
@@ -605,7 +664,7 @@ end
 
 -- --- Loader ---
 local loader = CreateFrame("Frame")
-loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE"); loader:RegisterEvent("UI_ERROR_MESSAGE"); loader:RegisterEvent("PARTY_MEMBERS_CHANGED"); loader:RegisterEvent("RAID_ROSTER_UPDATE"); loader:RegisterEvent("CHAT_MSG_ADDON")
+loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE"); loader:RegisterEvent("UI_ERROR_MESSAGE"); loader:RegisterEvent("PARTY_MEMBERS_CHANGED"); loader:RegisterEvent("RAID_ROSTER_UPDATE"); loader:RegisterEvent("CHAT_MSG_ADDON"); loader:RegisterEvent("SPELLCAST_CHANNEL_START"); loader:RegisterEvent("SPELLCAST_CHANNEL_UPDATE"); loader:RegisterEvent("SPELLCAST_CHANNEL_STOP"); loader:RegisterEvent("SPELLCAST_INTERRUPTED"); loader:RegisterEvent("SPELLCAST_FAILED")
 loader:SetScript("OnUpdate", function() 
     local elapsed = arg1 or 0; iconUpdateTick = iconUpdateTick + elapsed; if iconUpdateTick < 0.33 then return end; iconUpdateTick = 0
     local iconSpell = "None"
@@ -629,7 +688,26 @@ loader:SetScript("OnUpdate", function()
     end
 end)
 loader:SetScript("OnEvent", function()
-    if event == "VARIABLES_LOADED" then
+    if event == "SPELLCAST_CHANNEL_START" then
+        local duration = tonumber(arg1) or 0
+        local spellName = arg2 or ""
+        if string.find(spellName, "Drain Life", 1, true) then activeDrainChannel = "Drain Life"
+        elseif string.find(spellName, "Drain Soul", 1, true) then activeDrainChannel = "Drain Soul"
+        else activeDrainChannel = nil
+        end
+        if activeDrainChannel then
+            drainChannelEndTime = GetTime() + duration / 1000
+            pendingDrainChannel = nil
+            pendingDrainChannelUntil = 0
+        end
+    elseif event == "SPELLCAST_CHANNEL_UPDATE" then
+        if activeDrainChannel then drainChannelEndTime = GetTime() + (tonumber(arg1) or 0) / 1000 end
+    elseif event == "SPELLCAST_CHANNEL_STOP" or event == "SPELLCAST_INTERRUPTED" or event == "SPELLCAST_FAILED" then
+        activeDrainChannel = nil
+        drainChannelEndTime = 0
+        pendingDrainChannel = nil
+        pendingDrainChannelUntil = 0
+    elseif event == "VARIABLES_LOADED" then
         if not WarlockCore_Config then WarlockCore_Config = {} end
         if WarlockCore_Config.FastAttack == nil then WarlockCore_Config.FastAttack = true end
         if WarlockCore_Config.AutoFelDomination == nil then WarlockCore_Config.AutoFelDomination = true end
@@ -641,6 +719,7 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.SmartFear == nil then WarlockCore_Config.SmartFear = true end
         if WarlockCore_Config.NightfallShadowBolt == nil then WarlockCore_Config.NightfallShadowBolt = true end
         if WarlockCore_Config.DrainSoulSmart == nil then WarlockCore_Config.DrainSoulSmart = true end
+        if WarlockCore_Config.DrainSoulEnabled == nil then WarlockCore_Config.DrainSoulEnabled = true end
         if WarlockCore_Config.DrainSoulHP == nil then WarlockCore_Config.DrainSoulHP = 20 end
         if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
     elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" or event == "UI_ERROR_MESSAGE" then
