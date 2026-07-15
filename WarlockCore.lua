@@ -1,10 +1,10 @@
--- WarlockCore v1.8.4
+-- WarlockCore v1.8.9
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.8.4"
+local currentVer = "1.8.9"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -48,8 +48,8 @@ local petIcons = {
     ["Felhunter"] = "Spell_Shadow_SummonFelhunter"
 }
 
-local warlockOpenerSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
-local warlockRotationSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear", "Shoot" }
+local warlockOpenerSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Curse of the Elements", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
+local warlockRotationSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Curse of the Elements", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear", "Shoot" }
 local warlockBuffs = { "None", "Demon Skin", "Demon Armor", "Unending Breath" }
 local warlockPets = { "None", "Imp", "Voidwalker", "Succubus", "Felhunter" }
 
@@ -348,6 +348,7 @@ local function HasDebuff(unit, spell)
             local dur = 0
             if spell == "Corruption" then dur = 18
             elseif spell == "Curse of Agony" then dur = 24
+            elseif spell == "Curse of the Elements" then dur = 300
             elseif spell == "Siphon Life" then dur = 30
             elseif spell == "Immolate" then dur = 15
             elseif spell == "Drain Life" then dur = 5
@@ -386,12 +387,28 @@ local function GetNextSpell()
         if s and s ~= "None" then
             if s == "Drain Soul" and WarlockCore_Config.DrainSoulEnabled == false then
                 -- Drain Soul master switch is OFF; continue to the next slot.
-            elseif s == "Immolate" or s == "Corruption" or s == "Curse of Agony" or s == "Siphon Life" or s == "Drain Life" or s == "Drain Soul" then
+            elseif s == "Immolate" or s == "Corruption" or s == "Curse of Agony" or s == "Curse of the Elements" or s == "Siphon Life" or s == "Drain Life" or s == "Drain Soul" then
                 if not HasDebuff("target", s) then return s end
             else return s end
         end
     end
     return "None"
+end
+
+local function WRC_DrainChannelIsProtected()
+    local now = GetTime()
+    if activeDrainChannel and now < drainChannelEndTime - 0.3 then return true end
+    if pendingDrainChannel and now < pendingDrainChannelUntil then return true end
+    return false
+end
+
+local function WRC_CastDrainChannel(spellName)
+    if WRC_DrainChannelIsProtected() then return false end
+    local now = GetTime()
+    pendingDrainChannel = spellName
+    pendingDrainChannelUntil = now + 0.3
+    CastSpellByName(spellName)
+    return true
 end
 
 function WarlockCore_Rotate()
@@ -410,6 +427,10 @@ function WarlockCore_Rotate()
             return
         end
     end
+
+    -- Rotation buttons are commonly spammed. Give a drain time to start and
+    -- finish without a later press cancelling the active channel.
+    if WRC_DrainChannelIsProtected() then return end
     
     -- 0. Emergency Healthstone
     local hsHP = WarlockCore_Config.HealthstoneHP or 25
@@ -457,8 +478,15 @@ function WarlockCore_Rotate()
     local ns = GetNextSpell()
     if ns and ns ~= "None" then 
         WarlockCore_LastAttempt = ns
-        CastSpellByName(ns)
-        myDots[ns] = { target = GetUnitFingerprint("target"), time = GetTime() }
+        local castAttempted = true
+        if ns == "Drain Life" or ns == "Drain Soul" then
+            castAttempted = WRC_CastDrainChannel(ns)
+        else
+            CastSpellByName(ns)
+        end
+        if castAttempted then
+            myDots[ns] = { target = GetUnitFingerprint("target"), time = GetTime() }
+        end
     end
 end
 
@@ -479,15 +507,6 @@ function WarlockCore_Fear()
     end
     
     WarlockCore_LastAttempt = "Fear"; CastSpellByName("Fear")
-end
-
-local function WRC_CastDrainChannel(spellName)
-    local now = GetTime()
-    if activeDrainChannel == spellName and now < drainChannelEndTime - 0.3 then return end
-    if pendingDrainChannel == spellName and now < pendingDrainChannelUntil then return end
-    pendingDrainChannel = spellName
-    pendingDrainChannelUntil = now + 0.3
-    CastSpellByName(spellName)
 end
 
 function WarlockCore_DrainLife()
@@ -552,7 +571,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.4|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.9|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
