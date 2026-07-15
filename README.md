@@ -1,4 +1,4 @@
-# WarlockCore v1.8.1
+# WarlockCore v1.8.3
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1).
 
 WarlockCore is a high-performance combat suite designed to streamline Warlock gameplay with intelligent automation, resource management, and a premium 5-tab configuration interface.
@@ -8,11 +8,12 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 ### 🧠 Smart Combat Logic
 - **Smart Fear**: Tracks mobs that are immune to Fear (e.g., undead, mechanicals) in real-time and automatically switches to Shadow Bolt when those mobs are targeted.
 - **Nightfall Bolt**: Detects the Shadow Trance buff from Nightfall and makes your next **Rot** or **Fear** press cast Shadow Bolt before every other action.
-- **Smart Drain**: Intelligent Drain Soul management with health threshold configuration to ensure clean soul shard generation.
+- **Smart Drain**: Always forces Drain Soul at the chosen target-health threshold without disabling its normal rotation slot above the threshold.
 - **Immune Management**: Dynamic management of immune mobs via the "Info" tab.
 
 ### 🩸 Resource Automation
 - **Auto Stone**: Automatically consumes a Healthstone at a user-defined Health % threshold.
+- **Soulstone**: Out of combat, uses a Soulstone when its buff is missing and creates a replacement when possible.
 - **Auto Tap**: Intelligently uses Life Tap when mana is low, respecting a safety health threshold to ensure you never tap yourself into danger.
 
 ### 🐾 Pet Intelligence
@@ -23,14 +24,16 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 ### 🎨 Premium Interface
 - **Unified 5-Tab UI**: Clean organization across **Rotation, Pet, Buff, Options, and Info** tabs.
 - **Interactive Tooltips**: Hover over any setting in the "Options" tab to see a detailed description of its function.
-- **Macro Sync**: Drag-and-drop macros (Rot & Fear) that automatically update their icons in real-time based on your current combat state.
+- **Macro Sync**: Character-specific drag-and-drop macros for Rot, Fear, and pet summoning that automatically update their icons in real-time.
+- **Personal Drain Macros**: Drag separate Drain Life and Drain Soul macros that ignore repeated presses until the active channel has about 0.3 seconds remaining.
 
 ## ⚙️ Configuration Options (Options Tab)
 Every setting in the **Options** tab is designed to give you full control over the combat automation:
 
 - **Smart Fear**: Remembers immune mobs (Undead/Mechanical/Bosses) and automatically skips Fear on them to save mana.
 - **Nightfall Bolt**: When ON, Shadow Trance overrides both Rot and Fear with Shadow Bolt on your next keypress. Turn it OFF to keep the normal rotation and Fear behavior during Nightfall procs.
-- **Smart Drain**: Intelligently manages Drain Soul rank switching and power conflicts for seamless shard farming.
+- **Smart Drain**: Overrides the normal slot order with Drain Soul at the chosen target-health threshold, while Drain Soul still casts normally when its slot is reached above the threshold. Nightfall Shadow Bolt keeps first priority.
+- **Drain Soul**: Master switch that can disable Drain Soul as opener, in every rotation slot, and at the health threshold.
 - **Auto Stone**: Uses your Healthstone automatically when your Health falls below your chosen %; simply enter the threshold in the textbox.
 - **Auto Tap**: Intelligently uses Life Tap during your rotation if your mana is low, provided your health is above your safety %; enter the safety threshold in the textbox.
 - **Pet Assist**: The "Master Switch" for pet automation. When ON, the addon handles pet attacks; when OFF, you control the pet manually.
@@ -54,5 +57,5 @@ Every setting in the **Options** tab is designed to give you full control over t
 
 ---
 **Author**: Stephan
-**Version**: 1.8.1
+**Version**: 1.8.3
 **Compatibility**: Turtle WoW (Vanilla 1.12.1)
