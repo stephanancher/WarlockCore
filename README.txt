@@ -1,4 +1,4 @@
-WarlockCore v1.9.0
+WarlockCore v1.9.1
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1)
 
 ================================================================================
@@ -20,7 +20,8 @@ SMART COMBAT LOGIC:
 - Immune Management: Dynamic management of immune mobs via the "Info" tab.
 
 RESOURCE AUTOMATION:
-- Auto Stone: Consumes Healthstones at a custom Health % threshold.
+- Auto Stone: Consumes a Healthstone at a custom Health % threshold in combat.
+- Healthstone: Optional out-of-combat maintenance that keeps the highest available rank in your bags without consuming it.
 - Soulstone: Out of combat, uses a Soulstone when its buff is missing and creates a replacement when possible.
 - Felstone: Out of combat, uses a Felstone when its buff is missing and creates a replacement when possible.
 - Auto Tap: Safe mana-management logic via Life Tap.
@@ -45,7 +46,8 @@ DETAILED OPTIONS REFERENCE (OPTIONS TAB)
 - Smart Drain    : Forces Drain Soul at its threshold; above it, the slot works normally.
 - Drain Soul     : Master switch; OFF skips opener, rotation slots, and threshold.
 - Felstone       : Uses and recreates your Felstone outside combat.
-- Auto Stone     : Automatically uses Healthstone at the chosen HP %.
+- Auto Stone     : Uses a Healthstone in combat at the chosen HP %.
+- Healthstone    : When enabled, creates the highest available rank outside combat when missing and never consumes it.
 - Auto Tap       : Safe Life Tap logic (checks both mana and health).
 - Pet Assist     : Master Switch. When OFF, addon will NOT touch pet bar.
 - Smart Targets  : Auto-targets nearest enemy if you have none selected.
@@ -75,5 +77,5 @@ NONE. Standalone and lightweight.
 CONTACT & VERSION
 ================================================================================
 Author: Stephan
-Version: 1.9.0
+Version: 1.9.1
 Compatibility: Turtle WoW (1.12.1)

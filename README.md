@@ -1,4 +1,4 @@
-# WarlockCore v1.9.0
+# WarlockCore v1.9.1
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1).
 
 WarlockCore is a high-performance combat suite designed to streamline Warlock gameplay with intelligent automation, resource management, and a premium 5-tab configuration interface.
@@ -12,7 +12,8 @@ WarlockCore is a high-performance combat suite designed to streamline Warlock ga
 - **Immune Management**: Dynamic management of immune mobs via the "Info" tab.
 
 ### 🩸 Resource Automation
-- **Auto Stone**: Automatically consumes a Healthstone at a user-defined Health % threshold.
+- **Auto Stone**: Consumes a Healthstone at a user-defined Health % threshold in combat.
+- **Healthstone**: Optional out-of-combat maintenance that keeps the highest available Healthstone rank in your bags without consuming it.
 - **Soulstone**: Out of combat, uses a Soulstone when its buff is missing and creates a replacement when possible.
 - **Felstone**: Out of combat, uses a Felstone when its buff is missing and creates a replacement when possible.
 - **Auto Tap**: Intelligently uses Life Tap when mana is low, respecting a safety health threshold to ensure you never tap yourself into danger.
@@ -36,7 +37,8 @@ Every setting in the **Options** tab is designed to give you full control over t
 - **Smart Drain**: Overrides the normal slot order with Drain Soul at the chosen target-health threshold, while Drain Soul still casts normally when its slot is reached above the threshold. Nightfall Shadow Bolt keeps first priority.
 - **Drain Soul**: Master switch that can disable Drain Soul as opener, in every rotation slot, and at the health threshold.
 - **Felstone**: Uses an existing Felstone when its buff is missing, then creates a replacement when possible.
-- **Auto Stone**: Uses your Healthstone automatically when your Health falls below your chosen %; simply enter the threshold in the textbox.
+- **Auto Stone**: Uses a Healthstone in combat when your Health falls below your chosen %.
+- **Healthstone**: When enabled, creates the highest available Healthstone rank outside combat when none is in your bags. It never consumes the newly created stone.
 - **Auto Tap**: Intelligently uses Life Tap during your rotation if your mana is low, provided your health is above your safety %; enter the safety threshold in the textbox.
 - **Pet Assist**: The "Master Switch" for pet automation. When ON, the addon handles pet attacks; when OFF, you control the pet manually.
 - **Smart Targets**: Automatically targets the nearest enemy when you press your rotation macro if you don't already have a target.
@@ -59,5 +61,5 @@ Every setting in the **Options** tab is designed to give you full control over t
 
 ---
 **Author**: Stephan
-**Version**: 1.9.0
+**Version**: 1.9.1
 **Compatibility**: Turtle WoW (Vanilla 1.12.1)

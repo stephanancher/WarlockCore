@@ -1,10 +1,10 @@
--- WarlockCore v1.9.0
+-- WarlockCore v1.9.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.9.0"
+local currentVer = "1.9.1"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -31,6 +31,9 @@ local lastPetAttack, lastPetTargetName = 0, ""
 local lastSoulstoneBagWarning = -10
 local lastSoulstoneShardWarning = -10
 local lastSoulstoneSpellWarning = -10
+local lastHealthstoneBagWarning = -10
+local lastHealthstoneShardWarning = -10
+local lastHealthstoneSpellWarning = -10
 local lastFelstoneBagWarning = -10
 local lastFelstoneShardWarning = -10
 local lastFelstoneSpellWarning = -10
@@ -171,7 +174,7 @@ local function WRC_UseHealthstone()
     for b = 0, 4 do
         for s = 1, GetContainerNumSlots(b) do
             local link = GetContainerItemLink(b, s)
-            if link and string.find(link, "Healthstone") then
+            if link and string.find(string.lower(link), "healthstone", 1, true) then
                 local _, dur = GetContainerItemCooldown(b, s)
                 if dur == 0 then UseContainerItem(b, s); return true end
             end
@@ -185,6 +188,18 @@ local function WRC_FindSoulstone()
         for s = 1, GetContainerNumSlots(b) do
             local link = GetContainerItemLink(b, s)
             if link and string.find(string.lower(link), "soulstone", 1, true) then
+                return b, s
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function WRC_FindHealthstone()
+    for b = 0, 4 do
+        for s = 1, GetContainerNumSlots(b) do
+            local link = GetContainerItemLink(b, s)
+            if link and string.find(string.lower(link), "healthstone", 1, true) then
                 return b, s
             end
         end
@@ -240,6 +255,11 @@ local function WRC_ShowSoulstoneWarning(message)
     if UIErrorsFrame then UIErrorsFrame:AddMessage("Soulstone: " .. message, 1, 0.1, 0.1, 1) end
 end
 
+local function WRC_ShowHealthstoneWarning(message)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r |cffff0000Healthstone warning:|r " .. message)
+    if UIErrorsFrame then UIErrorsFrame:AddMessage("Healthstone: " .. message, 1, 0.1, 0.1, 1) end
+end
+
 local function WRC_ShowFelstoneWarning(message)
     DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r |cffff0000Felstone warning:|r " .. message)
     if UIErrorsFrame then UIErrorsFrame:AddMessage("Felstone: " .. message, 1, 0.1, 0.1, 1) end
@@ -269,6 +289,15 @@ local function WRC_GetSpellManaCost(spellIndex)
     return nil
 end
 
+local function WRC_GetStoneRankValue(name, rank)
+    local description = string.lower((name or "") .. " " .. (rank or ""))
+    if string.find(description, "minor", 1, true) then return 1 end
+    if string.find(description, "lesser", 1, true) then return 2 end
+    if string.find(description, "greater", 1, true) then return 4 end
+    if string.find(description, "major", 1, true) then return 5 end
+    return 3
+end
+
 local function WRC_GetReadySoulstoneSpellIndex()
     local readyIndex, readyName, readyRank = nil, nil, -1
     for i = 1, 250 do
@@ -277,13 +306,27 @@ local function WRC_GetReadySoulstoneSpellIndex()
         if string.find(string.lower(name), "create soulstone", 1, true) then
             local start, duration, enable = GetSpellCooldown(i, BOOKTYPE_SPELL)
             if enable == 1 and (not start or start == 0) and (not duration or duration == 0) then
-                local description = string.lower(name .. " " .. (rank or ""))
-                local rankValue = 3
-                if string.find(description, "minor", 1, true) then rankValue = 1
-                elseif string.find(description, "lesser", 1, true) then rankValue = 2
-                elseif string.find(description, "greater", 1, true) then rankValue = 4
-                elseif string.find(description, "major", 1, true) then rankValue = 5
+                local rankValue = WRC_GetStoneRankValue(name, rank)
+                if rankValue > readyRank then
+                    readyIndex = i
+                    readyName = name .. (rank and rank ~= "" and " (" .. rank .. ")" or "")
+                    readyRank = rankValue
                 end
+            end
+        end
+    end
+    return readyIndex, readyName
+end
+
+local function WRC_GetReadyHealthstoneSpellIndex()
+    local readyIndex, readyName, readyRank = nil, nil, -1
+    for i = 1, 250 do
+        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+        if string.find(string.lower(name), "create healthstone", 1, true) then
+            local start, duration, enable = GetSpellCooldown(i, BOOKTYPE_SPELL)
+            if enable == 1 and (not start or start == 0) and (not duration or duration == 0) then
+                local rankValue = WRC_GetStoneRankValue(name, rank)
                 if rankValue > readyRank then
                     readyIndex = i
                     readyName = name .. (rank and rank ~= "" and " (" .. rank .. ")" or "")
@@ -404,6 +447,49 @@ local function HasDebuff(unit, spell)
     return false
 end
 
+local function WRC_MaintainHealthstone()
+    local bag, slot = WRC_FindHealthstone()
+
+    -- Maintenance only creates a missing Healthstone. Emergency consumption is
+    -- handled separately by WRC_UseHealthstone during combat.
+    if bag and slot then return false end
+
+    if not WRC_HasFreeBagSlot() then
+        if GetTime() - lastHealthstoneBagWarning >= 10 then
+            WRC_ShowHealthstoneWarning("Your bags are full.")
+            lastHealthstoneBagWarning = GetTime()
+        end
+        return false
+    end
+
+    if not WRC_HasSoulShard() then
+        if GetTime() - lastHealthstoneShardWarning >= 10 then
+            WRC_ShowHealthstoneWarning("You have no Soul Shards.")
+            lastHealthstoneShardWarning = GetTime()
+        end
+        return false
+    end
+
+    local healthstoneSpellIndex, healthstoneSpellName = WRC_GetReadyHealthstoneSpellIndex()
+    if healthstoneSpellIndex then
+        local manaCost = WRC_GetSpellManaCost(healthstoneSpellIndex)
+        if manaCost and UnitMana("player") < manaCost then
+            dbg("Skipping Healthstone: requires " .. manaCost .. " mana.")
+            return false
+        end
+        dbg("Creating Healthstone with: " .. (healthstoneSpellName or "spellbook index"))
+        CastSpell(healthstoneSpellIndex, BOOKTYPE_SPELL)
+        return true
+    end
+
+    if GetTime() - lastHealthstoneSpellWarning >= 10 then
+        WRC_ShowHealthstoneWarning("Create Healthstone is not ready or was not found.")
+        lastHealthstoneSpellWarning = GetTime()
+    end
+
+    return false
+end
+
 local function WRC_MaintainFelstone()
     local bag, slot = WRC_FindFelstone()
     local hasBuff = WRC_HasFelstoneBuff()
@@ -515,8 +601,16 @@ end
 function WarlockCore_Rotate()
     if not WarlockCore_Config then return end
 
-    -- Nightfall is a short proc, so consume it before every other rotation
-    -- action, including emergency items, Life Tap, and maintenance buffs.
+    -- Emergency Healthstone is always first, including while a drain is being
+    -- channeled. The configured threshold is inclusive.
+    local hsHP = WarlockCore_Config.HealthstoneHP or 25
+    local maxHealth = UnitHealthMax("player")
+    if WarlockCore_Config.AutoHealthstone and maxHealth > 0 and (UnitHealth("player") / maxHealth) * 100 <= hsHP then
+        if WRC_UseHealthstone() then dbg("Emergency Healthstone used!"); return end
+    end
+
+    -- Nightfall is a short proc, so consume it before other rotation actions,
+    -- including Life Tap and maintenance buffs.
     if WRC_ShouldUseNightfallBolt() then
         if WarlockCore_Config.SmartTargeting and (not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target")) then
             TargetNearestEnemy()
@@ -533,12 +627,6 @@ function WarlockCore_Rotate()
     -- finish without a later press cancelling the active channel.
     if WRC_DrainChannelIsProtected() then return end
     
-    -- 0. Emergency Healthstone
-    local hsHP = WarlockCore_Config.HealthstoneHP or 25
-    if WarlockCore_Config.AutoHealthstone and (UnitHealth("player")/UnitHealthMax("player"))*100 < hsHP then
-        if WRC_UseHealthstone() then dbg("Emergency Healthstone used!"); return end
-    end
-
     -- 0b. Smart Life Tap
     local tapHP = WarlockCore_Config.LifeTapHP or 40
     if WarlockCore_Config.AutoLifeTap and UnitMana("player") < 150 and (UnitHealth("player")/UnitHealthMax("player")*100) > tapHP then
@@ -548,6 +636,7 @@ function WarlockCore_Rotate()
     -- 1. Buff Isolation
     if not UnitAffectingCombat("player") then
         if WarlockCore_Config.AutoSoulstone and WRC_MaintainSoulstone() then return end
+        if WarlockCore_Config.AutoCreateHealthstone and WRC_MaintainHealthstone() then return end
         if WarlockCore_Config.AutoFelstone and WRC_MaintainFelstone() then return end
     end
 
@@ -673,7 +762,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.9.0|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.9.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -733,7 +822,7 @@ local function CreateMenu()
     local sf = MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152); SetTip(sf, "Remembers immune mobs and automatically skips Fear on them.")
     local sd = MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152); SetTip(sd, "Forces Drain Soul at the chosen health threshold. Above it, Drain Soul still runs normally in its configured slot.")
     
-    local as = MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -35, 152); SetTip(as, "Automatically consumes a Healthstone when your HP drops below the chosen %.")
+    local as = MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -35, 152); SetTip(as, "In combat: consumes a Healthstone when your HP drops below the chosen %.")
     MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -35, 45)
     
     local at = MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -70, 152); SetTip(at, "Automatically uses Life Tap during rotation if mana is low and health is safe.")
@@ -750,6 +839,7 @@ local function CreateMenu()
     local ds = MakeToggle(pOpt, "Drain Soul", "DrainSoulEnabled", 175, -210, 152); SetTip(ds, "Master switch for Drain Soul. OFF skips it as opener, in rotation slots, and at the health threshold.")
 
     local fs = MakeToggle(pOpt, "Felstone", "AutoFelstone", 15, -245, 152); SetTip(fs, "Out of combat: uses a Felstone if its buff is missing, then creates a replacement when possible.")
+    local hs = MakeToggle(pOpt, "Healthstone", "AutoCreateHealthstone", 175, -245, 152); SetTip(hs, "Out of combat: creates the highest available Healthstone rank when none is in your bags. Never consumes it.")
     
     local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -280); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
 
@@ -838,6 +928,7 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.FastAttack == nil then WarlockCore_Config.FastAttack = true end
         if WarlockCore_Config.AutoFelDomination == nil then WarlockCore_Config.AutoFelDomination = true end
         if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
+        if WarlockCore_Config.AutoCreateHealthstone == nil then WarlockCore_Config.AutoCreateHealthstone = false end
         if WarlockCore_Config.AutoSoulstone == nil then WarlockCore_Config.AutoSoulstone = false end
         if WarlockCore_Config.AutoFelstone == nil then WarlockCore_Config.AutoFelstone = false end
         if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
