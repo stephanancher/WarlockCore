@@ -1,10 +1,10 @@
--- WarlockCore v1.8.9
+-- WarlockCore v1.9.0
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
 local _, class = UnitClass("player")
 if class ~= "WARLOCK" then return end
 
-local currentVer = "1.8.9"
+local currentVer = "1.9.0"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -31,6 +31,9 @@ local lastPetAttack, lastPetTargetName = 0, ""
 local lastSoulstoneBagWarning = -10
 local lastSoulstoneShardWarning = -10
 local lastSoulstoneSpellWarning = -10
+local lastFelstoneBagWarning = -10
+local lastFelstoneShardWarning = -10
+local lastFelstoneSpellWarning = -10
 local activeDrainChannel, drainChannelEndTime = nil, 0
 local pendingDrainChannel, pendingDrainChannelUntil = nil, 0
 local myDots = {}
@@ -189,6 +192,27 @@ local function WRC_FindSoulstone()
     return nil, nil
 end
 
+local function WRC_FindFelstone()
+    for b = 0, 4 do
+        for s = 1, GetContainerNumSlots(b) do
+            local link = GetContainerItemLink(b, s)
+            if link and string.find(string.lower(link), "felstone", 1, true) then
+                return b, s
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function WRC_HasFelstoneBuff()
+    for i = 1, 32 do
+        local texture = UnitBuff("player", i)
+        if not texture then break end
+        if string.find(WRC_NormalizeAuraName(texture), "felstone", 1, true) then return true end
+    end
+    return false
+end
+
 local function WRC_HasFreeBagSlot()
     for b = 0, 4 do
         for s = 1, GetContainerNumSlots(b) do
@@ -214,6 +238,11 @@ end
 local function WRC_ShowSoulstoneWarning(message)
     DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r |cffff0000Soulstone warning:|r " .. message)
     if UIErrorsFrame then UIErrorsFrame:AddMessage("Soulstone: " .. message, 1, 0.1, 0.1, 1) end
+end
+
+local function WRC_ShowFelstoneWarning(message)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r |cffff0000Felstone warning:|r " .. message)
+    if UIErrorsFrame then UIErrorsFrame:AddMessage("Felstone: " .. message, 1, 0.1, 0.1, 1) end
 end
 
 local soulstoneManaTooltip = CreateFrame("GameTooltip", "WRC_SoulstoneManaTooltip", UIParent, "GameTooltipTemplate")
@@ -264,6 +293,20 @@ local function WRC_GetReadySoulstoneSpellIndex()
         end
     end
     return readyIndex, readyName
+end
+
+local function WRC_GetReadyFelstoneSpellIndex()
+    for i = 1, 250 do
+        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+        if string.find(string.lower(name), "create felstone", 1, true) then
+            local start, duration, enable = GetSpellCooldown(i, BOOKTYPE_SPELL)
+            if enable == 1 and (not start or start == 0) and (not duration or duration == 0) then
+                return i, name .. (rank and rank ~= "" and " (" .. rank .. ")" or "")
+            end
+        end
+    end
+    return nil, nil
 end
 
 local function WRC_MaintainSoulstone()
@@ -361,6 +404,58 @@ local function HasDebuff(unit, spell)
     return false
 end
 
+local function WRC_MaintainFelstone()
+    local bag, slot = WRC_FindFelstone()
+    local hasBuff = WRC_HasFelstoneBuff()
+
+    if bag and slot then
+        if not hasBuff then
+            local _, duration = GetContainerItemCooldown(bag, slot)
+            if duration == 0 then
+                dbg("Using Felstone from bag.")
+                UseContainerItem(bag, slot)
+                return true
+            end
+        end
+        return false
+    end
+
+    if not WRC_HasFreeBagSlot() then
+        if GetTime() - lastFelstoneBagWarning >= 10 then
+            WRC_ShowFelstoneWarning("Your bags are full.")
+            lastFelstoneBagWarning = GetTime()
+        end
+        return false
+    end
+
+    if not WRC_HasSoulShard() then
+        if GetTime() - lastFelstoneShardWarning >= 10 then
+            WRC_ShowFelstoneWarning("You have no Soul Shards.")
+            lastFelstoneShardWarning = GetTime()
+        end
+        return false
+    end
+
+    local felstoneSpellIndex, felstoneSpellName = WRC_GetReadyFelstoneSpellIndex()
+    if felstoneSpellIndex then
+        local manaCost = WRC_GetSpellManaCost(felstoneSpellIndex)
+        if manaCost and UnitMana("player") < manaCost then
+            dbg("Skipping Felstone: requires " .. manaCost .. " mana.")
+            return false
+        end
+        dbg("Creating Felstone with: " .. (felstoneSpellName or "spellbook index"))
+        CastSpell(felstoneSpellIndex, BOOKTYPE_SPELL)
+        return true
+    end
+
+    if GetTime() - lastFelstoneSpellWarning >= 10 then
+        WRC_ShowFelstoneWarning("Create Felstone is not ready or was not found.")
+        lastFelstoneSpellWarning = GetTime()
+    end
+
+    return false
+end
+
 local function GetNextSpell()
     if not WarlockCore_Config then return "None" end
     if WRC_ShouldUseNightfallBolt() then return "Shadow Bolt" end
@@ -397,7 +492,13 @@ end
 
 local function WRC_DrainChannelIsProtected()
     local now = GetTime()
-    if activeDrainChannel and now < drainChannelEndTime - 0.3 then return true end
+    -- The live casting bar is authoritative: never start another drain while
+    -- the player is currently channeling a spell.
+    if CastingBarFrame and CastingBarFrame.channeling then return true end
+    -- Do not open an early recast window: another cast cancels the current
+    -- channel and charges its mana cost again.  The channel stop event clears
+    -- this state, while the end time prevents a missed event locking it forever.
+    if activeDrainChannel and now < drainChannelEndTime then return true end
     if pendingDrainChannel and now < pendingDrainChannelUntil then return true end
     return false
 end
@@ -406,7 +507,7 @@ local function WRC_CastDrainChannel(spellName)
     if WRC_DrainChannelIsProtected() then return false end
     local now = GetTime()
     pendingDrainChannel = spellName
-    pendingDrainChannelUntil = now + 0.3
+    pendingDrainChannelUntil = now + 1.0
     CastSpellByName(spellName)
     return true
 end
@@ -445,8 +546,9 @@ function WarlockCore_Rotate()
     end
 
     -- 1. Buff Isolation
-    if WarlockCore_Config.AutoSoulstone and not UnitAffectingCombat("player") then
-        if WRC_MaintainSoulstone() then return end
+    if not UnitAffectingCombat("player") then
+        if WarlockCore_Config.AutoSoulstone and WRC_MaintainSoulstone() then return end
+        if WarlockCore_Config.AutoFelstone and WRC_MaintainFelstone() then return end
     end
 
     if WarlockCore_Config.SelectedBuff and WarlockCore_Config.SelectedBuff ~= "None" then
@@ -571,7 +673,7 @@ local function CreateMenu()
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
     local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.8.9|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.9.0|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
     local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
@@ -646,10 +748,12 @@ local function CreateMenu()
     local nb = MakeToggle(pOpt, "Nightfall Bolt", "NightfallShadowBolt", 175, -175, 152); SetTip(nb, "When Shadow Trance procs, Rot and Fear cast Shadow Bolt before anything else.")
     local ss = MakeToggle(pOpt, "Soulstone", "AutoSoulstone", 15, -210, 152); SetTip(ss, "Out of combat: uses a Soulstone if the buff is missing, then creates a replacement when possible.")
     local ds = MakeToggle(pOpt, "Drain Soul", "DrainSoulEnabled", 175, -210, 152); SetTip(ds, "Master switch for Drain Soul. OFF skips it as opener, in rotation slots, and at the health threshold.")
-    
-    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -245); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
 
-    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -255, 5, 50, 290)
+    local fs = MakeToggle(pOpt, "Felstone", "AutoFelstone", 15, -245, 152); SetTip(fs, "Out of combat: uses a Felstone if its buff is missing, then creates a replacement when possible.")
+    
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -280); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -290, 5, 50, 290)
     -- Info Tab
     local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
@@ -712,6 +816,9 @@ loader:SetScript("OnEvent", function()
         local spellName = arg2 or ""
         if string.find(spellName, "Drain Life", 1, true) then activeDrainChannel = "Drain Life"
         elseif string.find(spellName, "Drain Soul", 1, true) then activeDrainChannel = "Drain Soul"
+        -- We only put Drain Life/Soul into pendingDrainChannel, so it is a safe
+        -- fallback when Turtle WoW does not provide the channel spell name.
+        elseif pendingDrainChannel then activeDrainChannel = pendingDrainChannel
         else activeDrainChannel = nil
         end
         if activeDrainChannel then
@@ -732,6 +839,7 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.AutoFelDomination == nil then WarlockCore_Config.AutoFelDomination = true end
         if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
         if WarlockCore_Config.AutoSoulstone == nil then WarlockCore_Config.AutoSoulstone = false end
+        if WarlockCore_Config.AutoFelstone == nil then WarlockCore_Config.AutoFelstone = false end
         if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
         if WarlockCore_Config.LifeTapHP == nil then WarlockCore_Config.LifeTapHP = 40 end
         if WarlockCore_Config.AutoLifeTap == nil then WarlockCore_Config.AutoLifeTap = true end

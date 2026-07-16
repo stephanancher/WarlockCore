@@ -1,4 +1,4 @@
-WarlockCore v1.8.9
+WarlockCore v1.9.0
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1)
 
 ================================================================================
@@ -22,6 +22,7 @@ SMART COMBAT LOGIC:
 RESOURCE AUTOMATION:
 - Auto Stone: Consumes Healthstones at a custom Health % threshold.
 - Soulstone: Out of combat, uses a Soulstone when its buff is missing and creates a replacement when possible.
+- Felstone: Out of combat, uses a Felstone when its buff is missing and creates a replacement when possible.
 - Auto Tap: Safe mana-management logic via Life Tap.
 
 PET INTELLIGENCE:
@@ -43,6 +44,7 @@ DETAILED OPTIONS REFERENCE (OPTIONS TAB)
                    with Shadow Bolt. OFF keeps their normal behavior.
 - Smart Drain    : Forces Drain Soul at its threshold; above it, the slot works normally.
 - Drain Soul     : Master switch; OFF skips opener, rotation slots, and threshold.
+- Felstone       : Uses and recreates your Felstone outside combat.
 - Auto Stone     : Automatically uses Healthstone at the chosen HP %.
 - Auto Tap       : Safe Life Tap logic (checks both mana and health).
 - Pet Assist     : Master Switch. When OFF, addon will NOT touch pet bar.
@@ -73,5 +75,5 @@ NONE. Standalone and lightweight.
 CONTACT & VERSION
 ================================================================================
 Author: Stephan
-Version: 1.8.9
+Version: 1.9.0
 Compatibility: Turtle WoW (1.12.1)
