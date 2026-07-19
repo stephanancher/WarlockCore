@@ -1,4 +1,4 @@
-# WarlockCore v1.10.1
+# WarlockCore v1.10.2
 Advanced Combat Automation & Interface for Turtle WoW (Vanilla 1.12.1).
 
 WarlockCore is a high-performance combat suite designed to streamline Warlock gameplay with intelligent automation, resource management, and a premium 5-tab configuration interface.
@@ -73,5 +73,5 @@ Settings are grouped by purpose across the **Pet**, **Buff**, and **Options** ta
 
 ---
 **Author**: Stephan
-**Version**: 1.10.1
+**Version**: 1.10.2
 **Compatibility**: Turtle WoW (Vanilla 1.12.1)
