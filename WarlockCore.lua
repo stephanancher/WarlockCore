@@ -1,10 +1,11 @@
--- WarlockCore v1.9.1
+-- WarlockCore v1.10.1
 -- Class Lock: Addon will only load if player is a WARLOCK.
 
-local _, class = UnitClass("player")
-if class ~= "WARLOCK" then return end
+local localizedClass, classToken = UnitClass("player")
+local playerClass = string.upper(classToken or localizedClass or "")
+if playerClass ~= "WARLOCK" then return end
 
-local currentVer = "1.9.1"
+local currentVer = "1.10.1"
 local gitUrl = "https://github.com/stephanancher/WarlockCore"
 local announcedInGroup = false
 local wrcMessages = {
@@ -39,14 +40,39 @@ local lastFelstoneShardWarning = -10
 local lastFelstoneSpellWarning = -10
 local activeDrainChannel, drainChannelEndTime = nil, 0
 local pendingDrainChannel, pendingDrainChannelUntil = nil, 0
+local hasMalediction = nil
 local myDots = {}
 
 local buffTextures = {
     ["Demon Armor"] = "Interface\\Icons\\Spell_Shadow_RagingScream",
     ["Demon Skin"] = "Interface\\Icons\\Spell_Shadow_DemonSkin",
+    ["Detect Lesser Invisibility"] = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility",
+    ["Shadow Ward"] = "Interface\\Icons\\Spell_Shadow_AntiShadow",
     ["Unending Breath"] = "Interface\\Icons\\Spell_Shadow_DemonBreath",
     ["Soulstone Resurrection"] = "Interface\\Icons\\Spell_Shadow_SoulGem"
 }
+local reactiveShadowDotNames = {
+    ["Shadow Word: Pain"] = true,
+    ["Devouring Plague"] = true,
+    ["Corruption"] = true,
+    ["Curse of Agony"] = true,
+    ["Curse of Doom"] = true,
+    ["Siphon Life"] = true,
+    ["Drain Life"] = true,
+    ["Drain Soul"] = true,
+    ["Dark Harvest"] = true
+}
+local reactiveShadowDotTextures = {
+    ["spell_shadow_shadowwordpain"] = true,
+    ["spell_shadow_blackplague"] = true,
+    ["spell_shadow_abominationexplosion"] = true,
+    ["spell_shadow_curseofsargeras"] = true,
+    ["spell_shadow_auraofdarkness"] = true,
+    ["spell_shadow_requiem"] = true,
+    ["spell_shadow_lifedrain02"] = true,
+    ["spell_shadow_haunting"] = true
+}
+local waitIcon = "INV_Misc_PocketWatch_01"
 local petIcons = {
     ["Imp"] = "Spell_Shadow_SummonImp",
     ["Voidwalker"] = "Spell_Shadow_SummonVoidwalker",
@@ -56,7 +82,7 @@ local petIcons = {
 
 local warlockOpenerSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Curse of the Elements", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear" }
 local warlockRotationSpells = { "None", "Immolate", "Corruption", "Curse of Agony", "Curse of the Elements", "Siphon Life", "Shadow Bolt", "Drain Life", "Drain Soul", "Death Coil", "Searing Pain", "Life Tap", "Fear", "Shoot" }
-local warlockBuffs = { "None", "Demon Skin", "Demon Armor", "Unending Breath" }
+local warlockBuffs = { "None", "Demon Skin", "Demon Armor", "Unending Breath", "Detect Lesser Invisibility", "Shadow Ward" }
 local warlockPets = { "None", "Imp", "Voidwalker", "Succubus", "Felhunter" }
 
 -- --- Helpers ---
@@ -66,8 +92,32 @@ local function dbg(m)
     end
 end
 
+local function WRC_HasLivingEnemyTarget()
+    return UnitExists("target")
+        and not UnitIsDead("target")
+        and UnitCanAttack("player", "target")
+end
+
+local function WRC_CanUseFearImmunityList(unit)
+    if not UnitExists(unit) or UnitIsPlayer(unit) then return false end
+    if UnitPlayerControlled and UnitPlayerControlled(unit) then return false end
+    return true
+end
+
+local function WRC_HasPvPEnemyTarget()
+    return WarlockCore_Config
+        and WarlockCore_Config.PvPMode
+        and WRC_HasLivingEnemyTarget()
+end
+
+local function WRC_InCombatMode()
+    return UnitAffectingCombat("player") or WRC_HasPvPEnemyTarget()
+end
+
 local function WRC_GetSpellTexture(name)
-    if not name or name == "None" then return "Spell_Shadow_DeadlyBolt" end
+    -- "None" is an intentional idle result: all configured DoTs are already
+    -- active and there is no filler or drain to cast, so show a clear WAIT icon.
+    if not name or name == "None" then return waitIcon end
     for i = 1, 250 do
         local n = GetSpellName(i, BOOKTYPE_SPELL); if n == name then
             local tex = GetSpellTexture(i, BOOKTYPE_SPELL); if tex then local _, _, short = string.find(tex, "([^\\/]+)$"); return short end
@@ -151,6 +201,28 @@ local function WRC_ShouldUseNightfallBolt()
     return WarlockCore_Config and WarlockCore_Config.NightfallShadowBolt and WRC_HasShadowTrance()
 end
 
+local shadowDotTooltip = CreateFrame("GameTooltip", "WRC_ShadowDotTooltip", UIParent, "GameTooltipTemplate")
+shadowDotTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+local function WRC_GetPlayerDebuffName(index)
+    if not shadowDotTooltip.SetUnitDebuff then return nil end
+    shadowDotTooltip:ClearLines()
+    shadowDotTooltip:SetUnitDebuff("player", index)
+    local title = getglobal("WRC_ShadowDotTooltipTextLeft1")
+    if title then return title:GetText() end
+    return nil
+end
+
+local function WRC_HasReactiveShadowDot()
+    for i = 1, 32 do
+        local texture = UnitDebuff("player", i)
+        if not texture then break end
+        if reactiveShadowDotTextures[WRC_NormalizeAuraName(texture)] then return true end
+        local debuffName = WRC_GetPlayerDebuffName(i)
+        if debuffName and reactiveShadowDotNames[debuffName] then return true end
+    end
+    return false
+end
+
 local function WRC_IsSpellReady(spellName)
     for i = 1, 250 do
         local name = GetSpellName(i, BOOKTYPE_SPELL)
@@ -193,6 +265,53 @@ local function WRC_FindSoulstone()
         end
     end
     return nil, nil
+end
+
+local function WRC_ShouldCastSelfTargetBuff(spellName)
+    return not WRC_InCombatMode()
+        and not HasBuff("player", spellName)
+end
+
+local function WRC_CastSelfTargetBuff(spellName)
+    local hadTarget = UnitExists("target")
+    local targetWasSelf = hadTarget and UnitIsUnit("target", "player")
+
+    if not targetWasSelf then TargetUnit("player") end
+    CastSpellByName(spellName)
+    if SpellIsTargeting() then SpellTargetUnit("player") end
+
+    if not targetWasSelf then
+        if hadTarget then TargetLastTarget() else ClearTarget() end
+    end
+end
+
+local function WRC_GetNextBuff()
+    if not WarlockCore_Config then return nil end
+    -- PvP Mode suppresses the entire buff circle when a living enemy is
+    -- targeted so the next Rotation press proceeds directly into combat logic.
+    if WRC_HasPvPEnemyTarget() then return nil end
+    local seenSpells = {}
+    local seenArmor = false
+
+    for i = 1, 5 do
+        local spellName = WarlockCore_Config["Buff" .. i]
+        if spellName and spellName ~= "None" and not seenSpells[spellName] then
+            seenSpells[spellName] = true
+            if spellName == "Demon Skin" or spellName == "Demon Armor" then
+                -- Armor buffs are mutually exclusive. Only the first configured
+                -- armor slot participates, preserving the existing self-buff logic.
+                if not seenArmor then
+                    seenArmor = true
+                    if not HasBuff("player", spellName) then return spellName end
+                end
+            elseif spellName == "Shadow Ward" then
+                if not WRC_InCombatMode() and not HasBuff("player", spellName) then return spellName end
+            elseif spellName == "Unending Breath" or spellName == "Detect Lesser Invisibility" then
+                if WRC_ShouldCastSelfTargetBuff(spellName) then return spellName end
+            end
+        end
+    end
+    return nil
 end
 
 local function WRC_FindHealthstone()
@@ -352,17 +471,69 @@ local function WRC_GetReadyFelstoneSpellIndex()
     return nil, nil
 end
 
+local function WRC_GetSoulstoneTarget()
+    if not WarlockCore_Config or not WarlockCore_Config.SoulstoneGroupMode then return "player" end
+
+    local groupUnits = {}
+    local raidCount = GetNumRaidMembers() or 0
+    if raidCount > 0 then
+        for i = 1, raidCount do table.insert(groupUnits, "raid" .. i) end
+    else
+        local partyCount = GetNumPartyMembers() or 0
+        for i = 1, partyCount do table.insert(groupUnits, "party" .. i) end
+    end
+
+    local classPriority = { "PRIEST", "PALADIN", "SHAMAN" }
+    for _, wantedClass in ipairs(classPriority) do
+        for _, unit in ipairs(groupUnits) do
+            local isVisible = not UnitIsVisible or UnitIsVisible(unit)
+            if UnitExists(unit) and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and isVisible then
+                local localizedClass, classToken = UnitClass(unit)
+                local candidateClass = string.upper(classToken or localizedClass or "")
+                if candidateClass == wantedClass then return unit end
+            end
+        end
+    end
+
+    return "player"
+end
+
 local function WRC_MaintainSoulstone()
     local bag, slot = WRC_FindSoulstone()
-    local hasBuff = HasBuff("player", "Soulstone Resurrection")
+    local soulstoneTarget = WRC_GetSoulstoneTarget()
+    local hasBuff = HasBuff(soulstoneTarget, "Soulstone Resurrection")
 
     if bag and slot then
         if not hasBuff then
             local _, duration = GetContainerItemCooldown(bag, slot)
             if duration == 0 then
-                dbg("Using Soulstone from bag.")
+                local hadTarget = UnitExists("target")
+                local targetWasSoulstoneTarget = hadTarget and UnitIsUnit("target", soulstoneTarget)
+                if not targetWasSoulstoneTarget then TargetUnit(soulstoneTarget) end
+
+                if not UnitIsUnit("target", soulstoneTarget) then
+                    dbg("Could not target " .. (UnitName(soulstoneTarget) or soulstoneTarget) .. " for Soulstone.")
+                    if not targetWasSoulstoneTarget then
+                        if hadTarget then TargetLastTarget() else ClearTarget() end
+                    end
+                    return false
+                end
+
+                dbg("Using Soulstone on " .. (UnitName(soulstoneTarget) or soulstoneTarget) .. ".")
+                if WarlockCore_Config.SoulstoneGroupMode then
+                    if soulstoneTarget == "player" then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r No living, connected, visible Priest, Paladin, or Shaman found. Soulstone target: |cff00ffff" .. UnitName("player") .. "|r (self).")
+                    else
+                        local localizedClass = UnitClass(soulstoneTarget) or "group member"
+                        DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9[WRC]|r Soulstone target: |cff00ffff" .. (UnitName(soulstoneTarget) or soulstoneTarget) .. "|r (" .. localizedClass .. ").")
+                    end
+                end
                 UseContainerItem(bag, slot)
-                if SpellIsTargeting() then SpellTargetUnit("player") end
+                if SpellIsTargeting() then SpellTargetUnit(soulstoneTarget) end
+
+                if not targetWasSoulstoneTarget then
+                    if hadTarget then TargetLastTarget() else ClearTarget() end
+                end
                 return true
             end
         end
@@ -410,16 +581,30 @@ local function GetUnitFingerprint(unit)
     return UnitName(unit) .. "_" .. UnitLevel(unit) .. "_" .. UnitHealthMax(unit)
 end
 
+local function WRC_UpdateMaledictionState()
+    hasMalediction = false
+    for tabIndex = 1, 3 do
+        local talentCount = GetNumTalents(tabIndex) or 0
+        for talentIndex = 1, talentCount do
+            local name, _, _, _, rank = GetTalentInfo(tabIndex, talentIndex)
+            if name == "Malediction" then
+                hasMalediction = rank and rank > 0
+                return
+            end
+        end
+    end
+end
+
 local function HasDebuff(unit, spell)
     local tx = WRC_GetSpellTexture(spell)
     if not tx then return false end
-    local texture = "interface\\icons\\" .. string.lower(tx)
+    local texture = WRC_NormalizeAuraName(tx)
     
     local exists = false
     for i = 1, 64 do 
         local dTex = UnitDebuff(unit, i)
         if not dTex then break end
-        if string.lower(dTex) == texture then exists = true; break end 
+        if WRC_NormalizeAuraName(dTex) == texture then exists = true; break end
     end
     
     if not exists then return false end
@@ -444,6 +629,10 @@ local function HasDebuff(unit, spell)
             if elapsed < (dur - 1.5) then return true end
         end
     end
+    -- The legacy aura API does not expose caster ownership. If the texture is
+    -- visible but no matching local timer survived (for example after /reload),
+    -- treat the debuff as active instead of endlessly recasting it.
+    if not record or record.target ~= fp then return true end
     return false
 end
 
@@ -545,32 +734,72 @@ end
 local function GetNextSpell()
     if not WarlockCore_Config then return "None" end
     if WRC_ShouldUseNightfallBolt() then return "Shadow Bolt" end
-    if not UnitAffectingCombat("player") then
+    if not WRC_InCombatMode() then
         local opener = WarlockCore_Config.Opener or "None"
         if opener == "Drain Soul" and WarlockCore_Config.DrainSoulEnabled == false then return "None" end
         return opener
     end
-    local s1, s2, s3, s4, s5 = WarlockCore_Config.Rotation1, WarlockCore_Config.Rotation2, WarlockCore_Config.Rotation3, WarlockCore_Config.Rotation4, WarlockCore_Config.Rotation5
-    local slots = { s1, s2, s3, s4, s5 }
+    local slots = {
+        WarlockCore_Config.Rotation1 or "None",
+        WarlockCore_Config.Rotation2 or "None",
+        WarlockCore_Config.Rotation3 or "None",
+        WarlockCore_Config.Rotation4 or "None",
+        WarlockCore_Config.Rotation5 or "None",
+        WarlockCore_Config.Rotation6 or "None"
+    }
 
     -- Drain Soul threshold overrides normal slot order. It does not depend on
     -- Drain Soul being configured in a slot. Nightfall remains above it.
     if WarlockCore_Config.DrainSoulEnabled ~= false and WarlockCore_Config.DrainSoulSmart and UnitExists("target") and UnitHealthMax("target") > 0 then
         local targetHP = (UnitHealth("target") / UnitHealthMax("target")) * 100
         local threshold = WarlockCore_Config.DrainSoulHP or 20
-        if targetHP <= threshold then
-            if not HasDebuff("target", "Drain Soul") then return "Drain Soul" end
-            return "None"
+        if targetHP <= threshold then return "Drain Soul" end
+    end
+
+    local drainSoulSelected = false
+    local drainLifeSelected = false
+    local seenCurse = false
+    if hasMalediction == nil then WRC_UpdateMaledictionState() end
+
+    -- First maintain every selected non-channelled damage-over-time spell in
+    -- slot order. Drains are deliberately deferred until these are all active.
+    for _, s in ipairs(slots) do
+        if s == "Drain Soul" then
+            -- An explicit rotation-slot selection always enables Drain Soul,
+            -- even when the automatic Drain Soul master switch is off.
+            drainSoulSelected = true
+        elseif s == "Drain Life" then
+            drainLifeSelected = true
+        elseif s == "Curse of Agony" or s == "Curse of the Elements" then
+            -- Malediction allows Agony to coexist with a support curse on
+            -- Turtle WoW, so maintain both selected curses independently.
+            -- Without it, keep only the first curse to prevent replacement loops.
+            -- A manually applied Curse of Exhaustion takes priority over an
+            -- automatic Elements refresh so the rotation preserves the slow.
+            if s == "Curse of the Elements" and HasDebuff("target", "Curse of Exhaustion") then
+                -- Keep Curse of Exhaustion; continue with the remaining slots.
+            elseif hasMalediction then
+                if not HasDebuff("target", s) then return s end
+            elseif not seenCurse then
+                seenCurse = true
+                if not HasDebuff("target", s) then return s end
+            end
+        elseif s == "Immolate" or s == "Corruption" or s == "Siphon Life" then
+            if not HasDebuff("target", s) then return s end
         end
     end
 
+    -- Once all selected DoTs are up, a selected drain becomes the rotation
+    -- fallback regardless of the slot number where it was configured.
+    -- Channel state, not the target's temporary drain aura, decides whether a
+    -- drain can be cast. WarlockCore_Rotate exits earlier while channeling.
+    if drainSoulSelected then return "Drain Soul" end
+    if drainLifeSelected then return "Drain Life" end
+
+    -- Ordinary non-DoT fillers only run when no selected drain needs casting.
     for _, s in ipairs(slots) do
-        if s and s ~= "None" then
-            if s == "Drain Soul" and WarlockCore_Config.DrainSoulEnabled == false then
-                -- Drain Soul master switch is OFF; continue to the next slot.
-            elseif s == "Immolate" or s == "Corruption" or s == "Curse of Agony" or s == "Curse of the Elements" or s == "Siphon Life" or s == "Drain Life" or s == "Drain Soul" then
-                if not HasDebuff("target", s) then return s end
-            else return s end
+        if s and s ~= "None" and s ~= "Drain Soul" and s ~= "Drain Life" and s ~= "Immolate" and s ~= "Corruption" and s ~= "Curse of Agony" and s ~= "Curse of the Elements" and s ~= "Siphon Life" then
+            return s
         end
     end
     return "None"
@@ -598,16 +827,44 @@ local function WRC_CastDrainChannel(spellName)
     return true
 end
 
+local function WRC_TryAutoLifeTap()
+    if not WarlockCore_Config or not WarlockCore_Config.AutoLifeTap then return false end
+    local maxHealth = UnitHealthMax("player")
+    local tapHP = WarlockCore_Config.LifeTapHP or 40
+    if UnitMana("player") < 150 and maxHealth > 0 and (UnitHealth("player") / maxHealth) * 100 > tapHP then
+        CastSpellByName("Life Tap")
+        return true
+    end
+    return false
+end
+
+local function WRC_TryEmergencyHealthstone()
+    if not WarlockCore_Config or not WarlockCore_Config.AutoHealthstone then return false end
+    local maxHealth = UnitHealthMax("player")
+    local threshold = WarlockCore_Config.HealthstoneHP or 25
+    if maxHealth > 0 and (UnitHealth("player") / maxHealth) * 100 <= threshold then
+        if WRC_UseHealthstone() then
+            dbg("Emergency Healthstone used!")
+            return true
+        end
+    end
+    return false
+end
+
+local function WRC_TryReactiveShadowWard()
+    if not WarlockCore_Config or not WarlockCore_Config.ReactiveShadowWard then return false end
+    if HasBuff("player", "Shadow Ward") or not WRC_HasReactiveShadowDot() then return false end
+    if not WRC_IsSpellReady("Shadow Ward") then return false end
+    dbg("Shadow DoT detected. Casting Shadow Ward.")
+    CastSpellByName("Shadow Ward")
+    return true
+end
+
 function WarlockCore_Rotate()
     if not WarlockCore_Config then return end
 
-    -- Emergency Healthstone is always first, including while a drain is being
-    -- channeled. The configured threshold is inclusive.
-    local hsHP = WarlockCore_Config.HealthstoneHP or 25
-    local maxHealth = UnitHealthMax("player")
-    if WarlockCore_Config.AutoHealthstone and maxHealth > 0 and (UnitHealth("player") / maxHealth) * 100 <= hsHP then
-        if WRC_UseHealthstone() then dbg("Emergency Healthstone used!"); return end
-    end
+    -- Emergency Healthstone is always first, including while channeling.
+    if WRC_TryEmergencyHealthstone() then return end
 
     -- Nightfall is a short proc, so consume it before other rotation actions,
     -- including Life Tap and maintenance buffs.
@@ -626,25 +883,29 @@ function WarlockCore_Rotate()
     -- Rotation buttons are commonly spammed. Give a drain time to start and
     -- finish without a later press cancelling the active channel.
     if WRC_DrainChannelIsProtected() then return end
+
+    -- Cast Shadow Ward only in response to a Priest or Warlock shadow DoT.
+    if WRC_TryReactiveShadowWard() then return end
     
     -- 0b. Smart Life Tap
-    local tapHP = WarlockCore_Config.LifeTapHP or 40
-    if WarlockCore_Config.AutoLifeTap and UnitMana("player") < 150 and (UnitHealth("player")/UnitHealthMax("player")*100) > tapHP then
-        CastSpellByName("Life Tap"); return
+    if WRC_TryAutoLifeTap() then return end
+
+    -- 1. Apply configured buffs before out-of-combat stone maintenance.
+    local nextBuff = WRC_GetNextBuff()
+    if nextBuff then
+        dbg("Buffing: " .. nextBuff)
+        if nextBuff == "Unending Breath" or nextBuff == "Detect Lesser Invisibility" then
+            WRC_CastSelfTargetBuff(nextBuff)
+        else
+            CastSpellByName(nextBuff)
+        end
+        return
     end
 
-    -- 1. Buff Isolation
-    if not UnitAffectingCombat("player") then
+    if not WRC_InCombatMode() then
         if WarlockCore_Config.AutoSoulstone and WRC_MaintainSoulstone() then return end
         if WarlockCore_Config.AutoCreateHealthstone and WRC_MaintainHealthstone() then return end
         if WarlockCore_Config.AutoFelstone and WRC_MaintainFelstone() then return end
-    end
-
-    if WarlockCore_Config.SelectedBuff and WarlockCore_Config.SelectedBuff ~= "None" then
-        if not HasBuff("player", WarlockCore_Config.SelectedBuff) then
-            dbg("Buffing: " .. WarlockCore_Config.SelectedBuff)
-            CastSpellByName(WarlockCore_Config.SelectedBuff); return
-        end
     end
 
     -- 2. Targeting
@@ -683,16 +944,18 @@ end
 
 function WarlockCore_Fear()
     if not WarlockCore_Config then return end
-    if not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target") then return end
+    local hasAttackableTarget = UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target")
 
-    if WRC_ShouldUseNightfallBolt() then
+    if hasAttackableTarget and WRC_ShouldUseNightfallBolt() then
         dbg("Shadow Trance active! Casting Shadow Bolt instead of Fear.")
         WarlockCore_LastAttempt = "Shadow Bolt"; CastSpellByName("Shadow Bolt"); return
     end
+
+    if WRC_TryAutoLifeTap() then return end
+    if not hasAttackableTarget then return end
     
     local name = UnitName("target")
-    local isPlayerTarget = UnitIsPlayer("target")
-    if WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] and not isPlayerTarget then
+    if WarlockCore_Config.SmartFear and WRC_CanUseFearImmunityList("target") and WarlockCore_Config.ImmuneMobs and WarlockCore_Config.ImmuneMobs[name] then
         dbg("Target is IMMUNE to Fear! Casting Shadow Bolt instead.")
         WarlockCore_LastAttempt = "Shadow Bolt"; CastSpellByName("Shadow Bolt"); return
     end
@@ -701,10 +964,12 @@ function WarlockCore_Fear()
 end
 
 function WarlockCore_DrainLife()
+    if WRC_TryEmergencyHealthstone() then return end
     WRC_CastDrainChannel("Drain Life")
 end
 
 function WarlockCore_DrainSoul()
+    if WRC_TryEmergencyHealthstone() then return end
     WRC_CastDrainChannel("Drain Soul")
 end
 
@@ -739,7 +1004,7 @@ local function GetMinimapButtonRadius()
 end
 
 function WarlockCore_Minimap_UpdatePosition()
-    if not WarlockCore_Config or not WarlockCore_Config.MinimapPos then return end
+    if not WarlockCoreMinimapButton or not WarlockCore_Config or not WarlockCore_Config.MinimapPos then return end
     local angle = math.rad(WarlockCore_Config.MinimapPos)
     local radius = GetMinimapButtonRadius()
     WarlockCoreMinimapButton:ClearAllPoints(); WarlockCoreMinimapButton:SetPoint("CENTER", "Minimap", "CENTER", math.cos(angle)*radius, math.sin(angle)*radius)
@@ -760,11 +1025,11 @@ end
 local function CreateMenu()
     if WarlockCoreMenuFrame then return end
     WarlockCoreMenuFrame = CreateFrame("Frame", "WarlockCoreMenuFrame", UIParent)
-    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(430); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
+    local f = WarlockCoreMenuFrame; f:SetWidth(350); f:SetHeight(475); f:SetPoint("CENTER", 0, 0); f:SetFrameStrata("HIGH")
     f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } }); f:SetBackdropColor(0,0,0,0.95); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart", function() this:StartMoving() end); f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.9.1|r")
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge"); title:SetPoint("TOP", 0, -18); title:SetText("|cff9482c9WarlockCore v1.10.1|r")
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -5, -5); close:SetScript("OnClick", function() f:Hide() end)
-    local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(300); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
+    local function CreateTab() local t = CreateFrame("Frame", nil, f); t:SetWidth(330); t:SetHeight(370); t:SetPoint("TOPLEFT", 10, -75); t:Hide(); return t end
     local pRot = CreateTab(); local pPet = CreateTab(); local pBuf = CreateTab(); local pOpt = CreateTab(); local pInf = CreateTab()
     local btnRot, btnPet, btnBuf, btnOpt, btnInf
     local function ShowTab(tab)
@@ -808,44 +1073,53 @@ local function CreateMenu()
     MakeDrop(pRot, "Slot 2:", "Rotation2", 175, -60, warlockRotationSpells, 120)
     MakeDrop(pRot, "Slot 3:", "Rotation3", 5, -120, warlockRotationSpells, 120)
     MakeDrop(pRot, "Slot 4:", "Rotation4", 175, -120, warlockRotationSpells, 120)
-    MakeDrop(pRot, "Slot 5:", "Rotation5", 90, -180, warlockRotationSpells, 120)
+    MakeDrop(pRot, "Slot 5:", "Rotation5", 5, -180, warlockRotationSpells, 120)
+    MakeDrop(pRot, "Slot 6:", "Rotation6", 175, -180, warlockRotationSpells, 120)
 
     -- Pet Tab
     MakeDrop(pPet, "Selected Pet:", "SelectedPet", 10, 0, warlockPets, 140)
     local dragPet = CreateFrame("Button", nil, pPet); dragPet:SetWidth(50); dragPet:SetHeight(50); dragPet:SetPoint("TOPLEFT", 20,-60); StyleButton(dragPet); dragPetIconTex = dragPet:CreateTexture(nil, "OVERLAY"); dragPetIconTex:SetPoint("TOPLEFT", 4,-4); dragPetIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragPetIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_SummonImp"); dragPet:RegisterForDrag("LeftButton"); dragPet:SetScript("OnDragStart", function() local n="WarlockSummon"; local b="/script WarlockCore_Summon()"; local ic=petIcons[WarlockCore_Config.SelectedPet or "Imp"] or "Spell_Shadow_SummonImp"; local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragPetL = pPet:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragPetL:SetPoint("TOPLEFT", 20, -115); dragPetL:SetText("Drag Macro: Summon")
+    local linePet = pPet:CreateTexture(nil, "ARTWORK"); linePet:SetHeight(1); linePet:SetWidth(310); linePet:SetPoint("TOP", 0, -145); linePet:SetTexture(0.5, 0.4, 0.7, 0.5)
+    local pa = MakeToggle(pPet, "Pet Assist", "PetAssist", 15, -160, 152); SetTip(pa, "Master Switch for pet automation. If OFF, the addon won't touch your pet.")
+    local fa = MakeToggle(pPet, "Fast Attack", "FastAttack", 175, -160, 152); SetTip(fa, "Sets style: Charges immediately when ON; waits for your spell hit when OFF. (Requires Pet Assist ON)")
+    local afd = MakeToggle(pPet, "Auto Fel Domination", "AutoFelDomination", 15, -195, 152); SetTip(afd, "Automatically casts Fel Domination when you summon a pet and the spell is ready.")
 
     -- Buff Tab
-    MakeDrop(pBuf, "Selected Armor Buff:", "SelectedBuff", 15, 0, warlockBuffs, 140)
+    local ss = MakeToggle(pBuf, "Soulstone", "AutoSoulstone", 15, 0, 152); SetTip(ss, "Out of combat: uses a Soulstone if the buff is missing, then creates a replacement when possible.")
+    local hs = MakeToggle(pBuf, "Healthstone", "AutoCreateHealthstone", 175, 0, 152); SetTip(hs, "Out of combat: creates the highest available Healthstone rank when none is in your bags. Never consumes it.")
+    local sgm = MakeToggle(pBuf, "Group Mode", "SoulstoneGroupMode", 15, -35, 152); SetTip(sgm, "Soulstones a visible, living, connected Priest first, then Paladin, then Shaman. Reports the chosen target and falls back to you if none are available.")
+    local fs = MakeToggle(pBuf, "Felstone", "AutoFelstone", 175, -35, 152); SetTip(fs, "Out of combat: uses a Felstone if its buff is missing, then creates a replacement when possible.")
+    local rsw = MakeToggle(pBuf, "Shadow Ward", "ReactiveShadowWard", 15, -70, 152); SetTip(rsw, "During Rotation presses, casts Shadow Ward only while you have a Priest or Warlock shadow-damage DoT and the ward is missing.")
+
+    local lineBuf = pBuf:CreateTexture(nil, "ARTWORK"); lineBuf:SetHeight(1); lineBuf:SetWidth(310); lineBuf:SetPoint("TOP", 0, -105); lineBuf:SetTexture(0.5, 0.4, 0.7, 0.5)
+    MakeDrop(pBuf, "Buff Slot 1:", "Buff1", 5, -120, warlockBuffs, 120)
+    MakeDrop(pBuf, "Buff Slot 2:", "Buff2", 175, -120, warlockBuffs, 120)
+    MakeDrop(pBuf, "Buff Slot 3:", "Buff3", 5, -180, warlockBuffs, 120)
+    MakeDrop(pBuf, "Buff Slot 4:", "Buff4", 175, -180, warlockBuffs, 120)
+    MakeDrop(pBuf, "Buff Slot 5:", "Buff5", 90, -240, warlockBuffs, 120)
 
     -- Options Tab
     local sf = MakeToggle(pOpt, "Smart Fear", "SmartFear", 15, 0, 152); SetTip(sf, "Remembers immune mobs and automatically skips Fear on them.")
-    local sd = MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152); SetTip(sd, "Forces Drain Soul at the chosen health threshold. Above it, Drain Soul still runs normally in its configured slot.")
+    local sd = MakeToggle(pOpt, "Smart Drain", "DrainSoulSmart", 175, 0, 152); SetTip(sd, "Forces Drain Soul at the chosen health threshold. A selected rotation slot remains active at every target-health level.")
     
-    local as = MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -35, 152); SetTip(as, "In combat: consumes a Healthstone when your HP drops below the chosen %.")
+    local as = MakeToggle(pOpt, "Auto Stone", "AutoHealthstone", 15, -35, 152); SetTip(as, "Uses a Healthstone at the chosen HP threshold on Rotation, Drain Life, or Drain Soul macro presses, including while channeling.")
     MakeEditBox(pOpt, "@ %:", "HealthstoneHP", 195, -35, 45)
     
-    local at = MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -70, 152); SetTip(at, "Automatically uses Life Tap during rotation if mana is low and health is safe.")
+    local at = MakeToggle(pOpt, "Auto Tap", "AutoLifeTap", 15, -70, 152); SetTip(at, "Automatically uses Life Tap on Rotation or Fear presses if mana is low and health is safe.")
     MakeEditBox(pOpt, "@ %:", "LifeTapHP", 195, -70, 45)
     
-    local pa = MakeToggle(pOpt, "Pet Assist", "PetAssist", 15, -105, 152); SetTip(pa, "Master Switch for pet automation. If OFF, the addon won't touch your pet.")
-    local st = MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 175, -105, 152); SetTip(st, "Automatically targets the nearest enemy when pressing Rotation if you don't have a target.")
-    
-    local fa = MakeToggle(pOpt, "Fast Attack", "FastAttack", 15, -140, 152); SetTip(fa, "Sets style: Charges immediately when ON; waits for your spell hit when OFF. (Requires Pet Assist ON)")
-    local afd = MakeToggle(pOpt, "Auto Fel Domination", "AutoFelDomination", 175, -140, 152); SetTip(afd, "Automatically casts Fel Domination when you summon a pet and the buff is active.")
-    local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 15, -175, 152); SetTip(dg, "Prints detailed combat logic and decision-making to your chat window (Spammy!)")
-    local nb = MakeToggle(pOpt, "Nightfall Bolt", "NightfallShadowBolt", 175, -175, 152); SetTip(nb, "When Shadow Trance procs, Rot and Fear cast Shadow Bolt before anything else.")
-    local ss = MakeToggle(pOpt, "Soulstone", "AutoSoulstone", 15, -210, 152); SetTip(ss, "Out of combat: uses a Soulstone if the buff is missing, then creates a replacement when possible.")
-    local ds = MakeToggle(pOpt, "Drain Soul", "DrainSoulEnabled", 175, -210, 152); SetTip(ds, "Master switch for Drain Soul. OFF skips it as opener, in rotation slots, and at the health threshold.")
+    local st = MakeToggle(pOpt, "Smart Targets", "SmartTargeting", 15, -105, 152); SetTip(st, "Automatically targets the nearest enemy when pressing Rotation if you don't have a target.")
+    local pvp = MakeToggle(pOpt, "PvP Mode", "PvPMode", 175, -105, 152); SetTip(pvp, "With a living enemy targeted, skips the opener, buff circle, and stone maintenance and immediately uses your combat rotation.")
+    local dg = MakeToggle(pOpt, "Debug Mode", "Debug", 15, -140, 152); SetTip(dg, "Prints detailed combat logic and decision-making to the chat window (Spammy!)")
+    local nb = MakeToggle(pOpt, "Nightfall Bolt", "NightfallShadowBolt", 175, -140, 152); SetTip(nb, "When Shadow Trance procs, Rot and Fear cast Shadow Bolt before anything else.")
+    local ds = MakeToggle(pOpt, "Drain Soul", "DrainSoulEnabled", 15, -175, 152); SetTip(ds, "Controls automatic Drain Soul opener and threshold behavior. An explicit rotation-slot selection always remains enabled.")
 
-    local fs = MakeToggle(pOpt, "Felstone", "AutoFelstone", 15, -245, 152); SetTip(fs, "Out of combat: uses a Felstone if its buff is missing, then creates a replacement when possible.")
-    local hs = MakeToggle(pOpt, "Healthstone", "AutoCreateHealthstone", 175, -245, 152); SetTip(hs, "Out of combat: creates the highest available Healthstone rank when none is in your bags. Never consumes it.")
-    
-    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -280); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
+    local lineOpt = pOpt:CreateTexture(nil, "ARTWORK"); lineOpt:SetHeight(1); lineOpt:SetWidth(310); lineOpt:SetPoint("TOP", 0, -215); lineOpt:SetTexture(0.5, 0.4, 0.7, 0.5)
 
-    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -290, 5, 50, 290)
+    MakeSlider(pOpt, "Drain Soul Threshold", "DrainSoulHP", 20, -225, 5, 50, 290)
     -- Info Tab
-    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\Spell_Shadow_DeadlyBolt"); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
+    local drag = CreateFrame("Button", nil, pInf); drag:SetWidth(50); drag:SetHeight(50); drag:SetPoint("TOPLEFT", 20,-10); StyleButton(drag); dragIconTex = drag:CreateTexture(nil, "OVERLAY"); dragIconTex:SetPoint("TOPLEFT", 4,-4); dragIconTex:SetPoint("BOTTOMRIGHT", -4,4); dragIconTex:SetTexture("Interface\\Icons\\" .. waitIcon); drag:RegisterForDrag("LeftButton"); drag:SetScript("OnDragStart", function() local n="Rot"; local b="/script WarlockCore_Rotate()"; local ic=WRC_GetSpellTexture(GetNextSpell()); local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragFear = CreateFrame("Button", nil, pInf); dragFear:SetWidth(50); dragFear:SetHeight(50); dragFear:SetPoint("TOPLEFT", 80,-10); StyleButton(dragFear); local dragFearTex = dragFear:CreateTexture(nil, "OVERLAY"); dragFearTex:SetPoint("TOPLEFT", 4,-4); dragFearTex:SetPoint("BOTTOMRIGHT", -4,4); dragFearTex:SetTexture("Interface\\Icons\\Spell_Shadow_Possession"); dragFear:RegisterForDrag("LeftButton"); dragFear:SetScript("OnDragStart", function() local n="Fear"; local b="/script WarlockCore_Fear()"; local ic="Spell_Shadow_Possession"; local idx=WRC_CreateCharacterMacro(n, ic, b); if idx and idx > 0 then PickupMacro(idx) end end)
     local dragL = pInf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"); dragL:SetPoint("TOPLEFT", 20, -65); dragL:SetText("Drag Macros: Rot & Fear")
 
@@ -877,18 +1151,19 @@ end
 
 -- --- Loader ---
 local loader = CreateFrame("Frame")
-loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE"); loader:RegisterEvent("UI_ERROR_MESSAGE"); loader:RegisterEvent("PARTY_MEMBERS_CHANGED"); loader:RegisterEvent("RAID_ROSTER_UPDATE"); loader:RegisterEvent("CHAT_MSG_ADDON"); loader:RegisterEvent("SPELLCAST_CHANNEL_START"); loader:RegisterEvent("SPELLCAST_CHANNEL_UPDATE"); loader:RegisterEvent("SPELLCAST_CHANNEL_STOP"); loader:RegisterEvent("SPELLCAST_INTERRUPTED"); loader:RegisterEvent("SPELLCAST_FAILED")
+loader:RegisterEvent("VARIABLES_LOADED"); loader:RegisterEvent("PLAYER_LOGIN"); loader:RegisterEvent("CHARACTER_POINTS_CHANGED"); loader:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE"); loader:RegisterEvent("UI_ERROR_MESSAGE"); loader:RegisterEvent("PARTY_MEMBERS_CHANGED"); loader:RegisterEvent("RAID_ROSTER_UPDATE"); loader:RegisterEvent("CHAT_MSG_ADDON"); loader:RegisterEvent("SPELLCAST_CHANNEL_START"); loader:RegisterEvent("SPELLCAST_CHANNEL_UPDATE"); loader:RegisterEvent("SPELLCAST_CHANNEL_STOP"); loader:RegisterEvent("SPELLCAST_INTERRUPTED"); loader:RegisterEvent("SPELLCAST_FAILED")
 loader:SetScript("OnUpdate", function() 
     local elapsed = arg1 or 0; iconUpdateTick = iconUpdateTick + elapsed; if iconUpdateTick < 0.33 then return end; iconUpdateTick = 0
     local iconSpell = "None"
-    if WarlockCore_Config and WarlockCore_Config.SelectedBuff ~= "None" and not HasBuff("player", WarlockCore_Config.SelectedBuff) then iconSpell = WarlockCore_Config.SelectedBuff else iconSpell = GetNextSpell() end
+    local nextBuff = WRC_GetNextBuff()
+    if nextBuff then iconSpell = nextBuff else iconSpell = GetNextSpell() end
     local icon = WRC_GetSpellTexture(iconSpell); if dragIconTex then dragIconTex:SetTexture("Interface\\Icons\\" .. icon) end
     local mIdx = WRC_GetMacroIndex("Rot"); if mIdx > 0 then EditMacro(mIdx, "Rot", icon, "/script WarlockCore_Rotate()", nil, nil) end 
     
     local fIdx = WRC_GetMacroIndex("Fear"); if fIdx > 0 then
         local fIcon = "Spell_Shadow_Possession"
         local name = UnitName("target")
-        if WRC_ShouldUseNightfallBolt() or (name and WarlockCore_Config.SmartFear and WarlockCore_Config.ImmuneMobs[name]) then fIcon = "Spell_Shadow_ShadowBolt" end
+        if WRC_ShouldUseNightfallBolt() or (name and WarlockCore_Config.SmartFear and WRC_CanUseFearImmunityList("target") and WarlockCore_Config.ImmuneMobs[name]) then fIcon = "Spell_Shadow_ShadowBolt" end
         EditMacro(fIdx, "Fear", fIcon, "/script WarlockCore_Fear()", nil, nil)
     end
     local sIdx = WRC_GetMacroIndex("WarlockSummon"); if sIdx > 0 then
@@ -901,7 +1176,9 @@ loader:SetScript("OnUpdate", function()
     end
 end)
 loader:SetScript("OnEvent", function()
-    if event == "SPELLCAST_CHANNEL_START" then
+    if event == "CHARACTER_POINTS_CHANGED" then
+        WRC_UpdateMaledictionState()
+    elseif event == "SPELLCAST_CHANNEL_START" then
         local duration = tonumber(arg1) or 0
         local spellName = arg2 or ""
         if string.find(spellName, "Drain Life", 1, true) then activeDrainChannel = "Drain Life"
@@ -929,7 +1206,28 @@ loader:SetScript("OnEvent", function()
         if WarlockCore_Config.AutoFelDomination == nil then WarlockCore_Config.AutoFelDomination = true end
         if WarlockCore_Config.AutoHealthstone == nil then WarlockCore_Config.AutoHealthstone = true end
         if WarlockCore_Config.AutoCreateHealthstone == nil then WarlockCore_Config.AutoCreateHealthstone = false end
+        if WarlockCore_Config.PvPMode == nil then WarlockCore_Config.PvPMode = false end
+        if WarlockCore_Config.ReactiveShadowWard == nil then WarlockCore_Config.ReactiveShadowWard = false end
+        if WarlockCore_Config.Rotation6 == nil then WarlockCore_Config.Rotation6 = "None" end
+        if WarlockCore_Config.Buff1 == nil then
+            local migratedBuffs = {}
+            local migratedSet = {}
+            local validBuffs = { ["Demon Skin"] = true, ["Demon Armor"] = true, ["Unending Breath"] = true, ["Detect Lesser Invisibility"] = true, ["Shadow Ward"] = true }
+            local function AddMigratedBuff(spellName)
+                if validBuffs[spellName] and not migratedSet[spellName] and table.getn(migratedBuffs) < 5 then
+                    table.insert(migratedBuffs, spellName)
+                    migratedSet[spellName] = true
+                end
+            end
+            AddMigratedBuff(WarlockCore_Config.SelectedBuff)
+            if WarlockCore_Config.AutoUnendingBreath then AddMigratedBuff("Unending Breath") end
+            if WarlockCore_Config.AutoDetectLesserInvisibility then AddMigratedBuff("Detect Lesser Invisibility") end
+            if WarlockCore_Config.AutoShadowWard then AddMigratedBuff("Shadow Ward") end
+            for i = 1, 5 do WarlockCore_Config["Buff" .. i] = migratedBuffs[i] or "None" end
+        end
+        for i = 1, 5 do if WarlockCore_Config["Buff" .. i] == nil then WarlockCore_Config["Buff" .. i] = "None" end end
         if WarlockCore_Config.AutoSoulstone == nil then WarlockCore_Config.AutoSoulstone = false end
+        if WarlockCore_Config.SoulstoneGroupMode == nil then WarlockCore_Config.SoulstoneGroupMode = false end
         if WarlockCore_Config.AutoFelstone == nil then WarlockCore_Config.AutoFelstone = false end
         if WarlockCore_Config.HealthstoneHP == nil then WarlockCore_Config.HealthstoneHP = 25 end
         if WarlockCore_Config.LifeTapHP == nil then WarlockCore_Config.LifeTapHP = 40 end
@@ -943,8 +1241,7 @@ loader:SetScript("OnEvent", function()
     elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" or event == "UI_ERROR_MESSAGE" then
         if arg1 and string.find(string.lower(arg1), "immune") then
             local name = UnitName("target")
-            local isPlayerTarget = UnitIsPlayer("target")
-            if name and not isPlayerTarget and WarlockCore_LastAttempt == "Fear" then
+            if name and WRC_CanUseFearImmunityList("target") and WarlockCore_LastAttempt == "Fear" then
                 if not WarlockCore_Config.ImmuneMobs then WarlockCore_Config.ImmuneMobs = {} end
                 if not WarlockCore_Config.ImmuneMobs[name] then
                     WarlockCore_Config.ImmuneMobs[name] = true
@@ -979,6 +1276,7 @@ loader:SetScript("OnEvent", function()
             end
         end
     elseif event == "PLAYER_LOGIN" then
+        WRC_UpdateMaledictionState()
         math.randomseed(GetTime())
         DEFAULT_CHAT_FRAME:AddMessage("|cff9482c9WarlockCore v" .. currentVer .. "|r Loaded. Currently |cff00ff00" .. WRC_GetRestedString() .. "|r Rested.")
         SendAddonMessage("WRC_V", currentVer, "PARTY")

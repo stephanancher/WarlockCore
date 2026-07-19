@@ -2,7 +2,7 @@
 ## Title: WarlockCore
 ## Notes: Basic Warlock addon for Turtle WoW
 ## Author: Stephan
-## Version: 1.9.1
+## Version: 1.10.1
 ## SavedVariables: WarlockCore_Config
 
 WarlockCore.lua
